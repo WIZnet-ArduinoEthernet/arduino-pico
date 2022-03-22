@@ -25,3 +25,7 @@
 [submodule "libraries/Adafruit_TinyUSB_Arduino"]
 	path = libraries/Adafruit_TinyUSB_Arduino
 	url = https://github.com/adafruit/Adafruit_TinyUSB_Arduino.git
+[submodule "libraries/Ethernet"]
+	path = libraries/Ethernet
+	url = git@github.com:WIZnet-ArduinoEthernet/Ethernet.git
+	branch = W5100S-EVB-Pico
