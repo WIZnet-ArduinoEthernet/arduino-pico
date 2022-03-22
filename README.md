@@ -47,7 +47,7 @@ Open up the Arduino IDE and go to File->Preferences.
 
 In the dialog that pops up, enter the following URL in the "Additional Boards Manager URLs" field:
 
-https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+https://github.com/WIZnet-ArduinoEthernet/arduino-pico/releases/download/global/package_rp2040-ethernet_index.json
 
 ![image](https://user-images.githubusercontent.com/11875/111917251-3c57f400-8a3c-11eb-8120-810a8328ab3f.png)
 
@@ -63,7 +63,7 @@ Type "pico" in the search box and select "Add":
 To install via GIT (for latest and greatest versions):
 ````
 mkdir -p ~/Arduino/hardware/pico
-git clone https://github.com/earlephilhower/arduino-pico.git ~/Arduino/hardware/pico/rp2040
+git clone https://github.com/WIZnet-ArduinoEthernet/arduino-pico.git ~/Arduino/hardware/pico/rp2040
 cd ~/Arduino/hardware/pico/rp2040
 git submodule update --init
 cd pico-sdk
@@ -174,3 +174,6 @@ If you want to contribute or have bugfixes, drop me a note at <earlephilhower@ya
 
 -Earle F. Philhower, III
  earlephilhower@yahoo.com
+
+-WIZnet
+ wiznet.io

@@ -1,17 +1,17 @@
 {
    "packages": [
       {
-         "name": "rp2040",
-         "maintainer": "Earle F. Philhower, III",
-         "websiteURL": "https://github.com/earlephilhower/arduino-pico",
-         "email": "earlephilhower@yahoo.com",
+         "name": "rp2040-ethernet",
+         "maintainer": "WIZnet",
+         "websiteURL": "https://github.com/WIZnet-ArduinoEthernet/arduino-pico",
+         "email": "https://forum.wiznet.io/",
          "help": {
             "online": "https://arduino-pico.readthedocs.io/en/latest/"
          },
          "platforms": [
             {
                "category": "Raspberry Pi Pico",
-               "name": "Raspberry Pi Pico/RP2040",
+               "name": "Raspberry Pi Pico/RP2040 Ethernet",
                "url": "",
                "version": "",
                "architecture": "rp2040",
@@ -92,32 +92,32 @@
                ],
                "toolsDependencies": [
                   {
-                     "packager": "rp2040",
+                     "packager": "rp2040-ethernet",
                      "version": "1.3.3-a-ed6d983",
                      "name": "pqt-gcc"
                   },
                   {
-                     "packager": "rp2040",
+                     "packager": "rp2040-ethernet",
                      "version": "1.3.3-a-ed6d983",
                      "name": "pqt-mklittlefs"
                   },
                   {
-                     "packager": "rp2040",
+                     "packager": "rp2040-ethernet",
                      "version": "1.3.3-a-ed6d983",
                      "name": "pqt-elf2uf2"
                   },
                   {
-                     "packager": "rp2040",
+                     "packager": "rp2040-ethernet",
                      "version": "1.3.3-a-ed6d983",
                      "name": "pqt-pioasm"
                   },
                   {
-                     "packager": "rp2040",
+                     "packager": "rp2040-ethernet",
                      "version": "1.0.1-base-3a57aed",
                      "name": "pqt-python3"
                   },
                   {
-                     "packager": "rp2040",
+                     "packager": "rp2040-ethernet",
                      "version": "1.3.3-a-ed6d983",
                      "name": "pqt-openocd"
                   }
