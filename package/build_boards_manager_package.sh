@@ -154,7 +154,7 @@ cat $srcdir/package/package_pico_index.template.json | \
 # Download previous release
 echo "Downloading base package: $base_ver"
 old_json=package_rp2040-ethernet_index_stable.json
-curl -L -o $old_json "https://github.com/WIZnet-ArduinoEthernet/arduino-WIZnet-ArduinoEthernet/releases/download/${base_ver}/package_rp2040-ethernet_index.json"
+curl -L -o $old_json "https://github.com/WIZnet-ArduinoEthernet/arduino-pico/releases/download/${base_ver}/package_rp2040-ethernet_index.json"
 new_json=package_rp2040-ethernet_index.json
 
 set +e
