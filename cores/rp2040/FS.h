@@ -18,8 +18,7 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef FS_H
-#define FS_H
+#pragma once
 
 #include <memory>
 #include <Arduino.h>
@@ -91,9 +90,8 @@ public:
         uint8_t obuf[256];
         size_t doneLen = 0;
         size_t sentLen;
-        int i;
 
-        while (src.available() > sizeof(obuf)) {
+        while ((size_t)src.available() > sizeof(obuf)) {
             src.read(obuf, sizeof(obuf));
             sentLen = write(obuf, sizeof(obuf));
             doneLen = doneLen + sentLen;
@@ -188,15 +186,6 @@ public:
     bool     _autoFormat;
 };
 
-class SPIFFSConfig : public FSConfig {
-public:
-    static constexpr uint32_t FSId = 0x53504946;
-    SPIFFSConfig(bool autoFormat = true) : FSConfig(FSId, autoFormat) { }
-
-    // Inherit _type and _autoFormat
-    // nothing yet, enableTime TBD when SPIFFS has metadate
-};
-
 class FS {
 public:
     FS(FSImplPtr impl) : _impl(impl) {
@@ -272,11 +261,4 @@ using fs::SeekCur;
 using fs::SeekEnd;
 using fs::FSInfo;
 using fs::FSConfig;
-using fs::SPIFFSConfig;
 #endif //FS_NO_GLOBALS
-
-#if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_SPIFFS)
-extern fs::FS SPIFFS __attribute__((deprecated("SPIFFS has been deprecated. Please consider moving to LittleFS or other filesystems.")));
-#endif
-
-#endif //FS_H

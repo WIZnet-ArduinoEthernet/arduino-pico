@@ -18,8 +18,7 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef Arduino_h
-#define Arduino_h
+#pragma once
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -79,6 +78,9 @@ void analogWriteFreq(uint32_t freq);
 void analogWriteRange(uint32_t range);
 void analogWriteResolution(int res);
 
+// FreeRTOS potential calls
+extern bool __isFreeRTOS;
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
@@ -109,5 +111,3 @@ constexpr uint32_t __bitset(const int (&a)[N], size_t i = 0U) {
     return i < N ? (1L << a[i]) | __bitset(a, i + 1) : 0;
 }
 #endif
-
-#endif // Arduino_h

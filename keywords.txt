@@ -11,7 +11,7 @@
 #######################################
 
 setup1	KEYWORD2
-loop2	KEYWORD2
+loop1	KEYWORD2
 
 analogWriteFreq	KEYWORD2
 analogWriteRange	KEYWORD2
@@ -23,6 +23,8 @@ pop	KEYWORD2
 pop_nb	KEYWORD2
 
 rp2040	KEYWORD2
+reboot	KEYWORD2
+restart	KEYWORD2
 RP2040	KEYWORD2
 usToPIOCycles	KEYWORD2
 f_cpu	KEYWORD2
@@ -36,3 +38,8 @@ prepare	KEYWORD2
 SerialPIO	KEYWORD2
 setFIFOSize	KEYWORD2
 setPollingMode	KEYWORD2
+
+OUTPUT_2MA	LITERAL1
+OUTPUT_4MA	LITERAL1
+OUTPUT_8MA	LITERAL1
+OUTPUT_12MA	LITERAL1

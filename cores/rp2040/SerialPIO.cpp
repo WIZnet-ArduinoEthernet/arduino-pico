@@ -97,7 +97,7 @@ void __not_in_flash_func(SerialPIO::_handleIRQ)() {
     }
     while (!pio_sm_is_rx_fifo_empty(_rxPIO, _rxSM)) {
         uint32_t decode = _rxPIO->rxf[_rxSM];
-        decode >>= 32 - _rxBits;
+        decode >>= 33 - _rxBits;
         uint32_t val = 0;
         for (int b = 0; b < _bits + 1; b++) {
             val |= (decode & (1 << (b * 2))) ? 1 << b : 0;
@@ -127,7 +127,7 @@ void __not_in_flash_func(SerialPIO::_handleIRQ)() {
             asm volatile("" ::: "memory"); // Ensure the queue is written before the written count advances
             _writer = next_writer;
         } else {
-            // TODO: Overflow
+            _overflow = true;
         }
     }
 }
@@ -146,6 +146,7 @@ SerialPIO::~SerialPIO() {
 }
 
 void SerialPIO::begin(unsigned long baud, uint16_t config) {
+    _overflow = false;
     _baud = baud;
     switch (config & SERIAL_PARITY_MASK) {
     case SERIAL_PARITY_EVEN:
@@ -229,7 +230,7 @@ void SerialPIO::begin(unsigned long baud, uint16_t config) {
         pio_sm_clear_fifos(_rxPIO, _rxSM); // Remove any existing data
 
         // Put phase divider into OSR w/o using add'l program memory
-        pio_sm_put_blocking(_rxPIO, _rxSM, clock_get_hz(clk_sys) / (_baud * 2) - 2);
+        pio_sm_put_blocking(_rxPIO, _rxSM, clock_get_hz(clk_sys) / (_baud * 2) - 5 /* insns in PIO halfbit loop */);
         pio_sm_exec(_rxPIO, _rxSM, pio_encode_pull(false, false));
 
         // Join the TX FIFO to the RX one now that we don't need it
@@ -256,8 +257,23 @@ void SerialPIO::end() {
     if (!_running) {
         return;
     }
-    // TODO: Deallocate PIO resources, stop them
-    _pioSP[pio_get_index(_rxPIO)][_rxSM] = nullptr;
+    if (_tx != NOPIN) {
+        pio_sm_set_enabled(_txPIO, _txSM, false);
+    }
+    if (_rx != NOPIN) {
+        pio_sm_set_enabled(_rxPIO, _rxSM, false);
+        _pioSP[pio_get_index(_rxPIO)][_rxSM] = nullptr;
+        // If no more active, disable the IRQ
+        auto pioNum = pio_get_index(_rxPIO);
+        bool used = false;
+        for (int i = 0; i < 4; i++) {
+            used = used || !!_pioSP[pioNum][i];
+        }
+        if (!used) {
+            auto irqno = pioNum == 0 ? PIO0_IRQ_0 : PIO1_IRQ_0;
+            irq_set_enabled(irqno, false);
+        }
+    }
     _running = false;
 }
 
@@ -287,6 +303,17 @@ int SerialPIO::read() {
         return ret;
     }
     return -1;
+}
+
+bool SerialPIO::overflow() {
+    CoreMutex m(&_mutex);
+    if (!_running || !m || (_rx == NOPIN)) {
+        return false;
+    }
+
+    bool hold = _overflow;
+    _overflow = false;
+    return hold;
 }
 
 int SerialPIO::available() {

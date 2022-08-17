@@ -126,12 +126,11 @@ void TwoWire::begin(uint8_t addr) {
     i2c_set_slave_mode(_i2c, true, addr);
 
     // Our callback IRQ
-    _i2c->hw->intr_mask = (1 << 10) | (1 << 9) | (1 << 6) | (1 << 5) | (1 << 2);
+    _i2c->hw->intr_mask = (1 << 12) | (1 << 10) | (1 << 9) | (1 << 6) | (1 << 5) | (1 << 2);
 
     int irqNo = I2C0_IRQ + i2c_hw_index(_i2c);
     irq_set_exclusive_handler(irqNo, i2c_hw_index(_i2c) == 0 ? _handler0 : _handler1);
     irq_set_enabled(irqNo, true);
-
 
     gpio_set_function(_sda, GPIO_FUNC_I2C);
     gpio_pull_up(_sda);
@@ -142,6 +141,15 @@ void TwoWire::begin(uint8_t addr) {
 }
 
 void TwoWire::onIRQ() {
+    if (_i2c->hw->intr_stat & (1 << 12)) {
+        if (_onReceiveCallback && _buffLen) {
+            _onReceiveCallback(_buffLen);
+        }
+        _buffLen = 0;
+        _buffOff = 0;
+        _slaveStartDet = false;
+        _i2c->hw->clr_restart_det;
+    }
     if (_i2c->hw->intr_stat & (1 << 10)) {
         _buffLen = 0;
         _buffOff = 0;
@@ -183,7 +191,15 @@ void TwoWire::end() {
         // ERROR
         return;
     }
+
+    if (_slave) {
+        int irqNo = I2C0_IRQ + i2c_hw_index(_i2c);
+        irq_remove_handler(irqNo, i2c_hw_index(_i2c) == 0 ? _handler0 : _handler1);
+        irq_set_enabled(irqNo, false);
+    }
+
     i2c_deinit(_i2c);
+
     pinMode(_sda, INPUT);
     pinMode(_scl, INPUT);
     _running = false;
@@ -207,7 +223,7 @@ size_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit) {
     }
 
     _buffLen = i2c_read_blocking_until(_i2c, address, _buff, quantity, !stopBit, make_timeout_time_ms(_timeout));
-    if (_buffLen == PICO_ERROR_GENERIC) {
+    if ((_buffLen == PICO_ERROR_GENERIC) || (_buffLen == PICO_ERROR_TIMEOUT)) {
         _buffLen = 0;
     }
     _buffOff = 0;
@@ -368,5 +384,12 @@ void TwoWire::onRequest(void(*function)(void)) {
     _onRequestCallback = function;
 }
 
-TwoWire Wire(i2c0, PIN_WIRE0_SDA, PIN_WIRE0_SCL);
-TwoWire Wire1(i2c1, PIN_WIRE1_SDA, PIN_WIRE1_SCL);
+#ifndef __WIRE0_DEVICE
+#define __WIRE0_DEVICE i2c0
+#endif
+#ifndef __WIRE1_DEVICE
+#define __WIRE1_DEVICE i2c1
+#endif
+
+TwoWire Wire(__WIRE0_DEVICE, PIN_WIRE0_SDA, PIN_WIRE0_SCL);
+TwoWire Wire1(__WIRE1_DEVICE, PIN_WIRE1_SDA, PIN_WIRE1_SCL);

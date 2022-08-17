@@ -1,5 +1,12 @@
 {
   "build": {
+    "arduino": {
+      "earlephilhower": {
+        "boot2_source": "boot2_w25q080_2_padded_checksum.S",
+        "usb_vid": "0x2E8A",
+        "usb_pid": "0x1007"
+      }
+    },
     "core": "earlephilhower",
     "cpu": "cortex-m0plus",
     "extra_flags": "-D ARDUINO_UPESY_RP2040_DEVKIT -DARDUINO_ARCH_RP2040 -DUSBD_MAX_POWER_MA=250",
@@ -8,19 +15,14 @@
       [
         "0x2E8A",
         "0x00C0"
+      ],
+      [
+        "0x2E8A",
+        "0x1007"
       ]
     ],
     "mcu": "rp2040",
-    "arduino": {
-      "earlephilhower": {
-        "variant": "upesy_rp2040_devkit",
-        "boot2_source": "boot2_w25q080_2_padded_checksum.S",
-        "usb_vid": "0x2e8a",
-        "usb_pid": "0x1007",
-        "usb_manufacturer": "uPesy",
-        "usb_product": "RP2040 DevKit"
-      }
-    }
+    "variant": "upesy_rp2040_devkit"
   },
   "debug": {
     "jlink_device": "RP2040_M0_0",
