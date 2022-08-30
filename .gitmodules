@@ -38,3 +38,6 @@
 [submodule "ota/uzlib"]
 	path = ota/uzlib
 	url = https://github.com/pfalcon/uzlib.git
+[submodule "libraries/WizFi360_arduino_library"]
+	path = libraries/WizFi360_arduino_library
+	url = https://github.com/Wiznet/WizFi360_arduino_library.git
