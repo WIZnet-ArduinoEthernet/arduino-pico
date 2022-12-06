@@ -41,6 +41,7 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * uPesy RP2040 DevKit
 * WIZnet W5100S-EVB-Pico
 * WIZnet W5500-EVB-Pico
+* WIZnet W6100-EVB-Pico
 * WIZnet WizFi360-EVB-Pico
 * Generic (configurable flash, I/O pins)
 
