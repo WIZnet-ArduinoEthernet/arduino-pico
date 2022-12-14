@@ -16849,8 +16849,8 @@ wiznet_5500_evb_picopicodebug.menu.ipstack.ipv4ipv6.build.lwipdefs=-DLWIP_IPV6=1
 # -----------------------------------
 wiznet_6100_evb_pico.name=WIZnet W6100-EVB-Pico
 wiznet_6100_evb_pico.vid.0=0x2e8a
-wiznet_6100_evb_pico.pid.0=0x1029
-wiznet_6100_evb_pico.build.usbpid=-DSERIALUSB_PID=0x1029
+wiznet_6100_evb_pico.pid.0=0x1046
+wiznet_6100_evb_pico.build.usbpid=-DSERIALUSB_PID=0x1046
 wiznet_6100_evb_pico.build.usbpwr=-DUSBD_MAX_POWER_MA=250
 wiznet_6100_evb_pico.build.board=WIZNET_6100_EVB_PICO
 wiznet_6100_evb_pico.build.mcu=cortex-m0plus
@@ -16869,7 +16869,7 @@ wiznet_6100_evb_pico.build.ldscript=memmap_default.ld
 wiznet_6100_evb_pico.build.ram_length=256k
 wiznet_6100_evb_pico.build.boot2=boot2_w25q080_2_padded_checksum
 wiznet_6100_evb_pico.build.vid=0x2e8a
-wiznet_6100_evb_pico.build.pid=0x1029
+wiznet_6100_evb_pico.build.pid=0x1046
 wiznet_6100_evb_pico.build.usb_manufacturer="WIZnet"
 wiznet_6100_evb_pico.build.usb_product="W6100-EVB-Pico"
 wiznet_6100_evb_pico.menu.flash.2097152_0=2MB (no FS)
@@ -16997,7 +16997,7 @@ wiznet_6100_evb_pico.menu.ipstack.ipv4ipv6.build.lwipdefs=-DLWIP_IPV6=1 -DLWIP_I
 wiznet_6100_evb_picopicoprobe.name=WIZnet W6100-EVB-Pico (Picoprobe)
 wiznet_6100_evb_picopicoprobe.vid.0=0x2e8a
 wiznet_6100_evb_picopicoprobe.pid.0=0x0004
-wiznet_6100_evb_picopicoprobe.build.usbpid=-DSERIALUSB_PID=0x1029
+wiznet_6100_evb_picopicoprobe.build.usbpid=-DSERIALUSB_PID=0x1046
 wiznet_6100_evb_picopicoprobe.build.usbpwr=-DUSBD_MAX_POWER_MA=250
 wiznet_6100_evb_picopicoprobe.build.board=WIZNET_6100_EVB_PICO
 wiznet_6100_evb_picopicoprobe.build.mcu=cortex-m0plus
@@ -17016,7 +17016,7 @@ wiznet_6100_evb_picopicoprobe.build.ldscript=memmap_default.ld
 wiznet_6100_evb_picopicoprobe.build.ram_length=256k
 wiznet_6100_evb_picopicoprobe.build.boot2=boot2_w25q080_2_padded_checksum
 wiznet_6100_evb_picopicoprobe.build.vid=0x2e8a
-wiznet_6100_evb_picopicoprobe.build.pid=0x1029
+wiznet_6100_evb_picopicoprobe.build.pid=0x1046
 wiznet_6100_evb_picopicoprobe.build.usb_manufacturer="WIZnet"
 wiznet_6100_evb_picopicoprobe.build.usb_product="W6100-EVB-Pico (Picoprobe)"
 wiznet_6100_evb_picopicoprobe.menu.flash.2097152_0=2MB (no FS)
@@ -17144,7 +17144,7 @@ wiznet_6100_evb_picopicoprobe.menu.ipstack.ipv4ipv6.build.lwipdefs=-DLWIP_IPV6=1
 wiznet_6100_evb_picopicodebug.name=WIZnet W6100-EVB-Pico (pico-debug)
 wiznet_6100_evb_picopicodebug.vid.0=0x1209
 wiznet_6100_evb_picopicodebug.pid.0=0x2488
-wiznet_6100_evb_picopicodebug.build.usbpid=-DSERIALUSB_PID=0x1029
+wiznet_6100_evb_picopicodebug.build.usbpid=-DSERIALUSB_PID=0x1046
 wiznet_6100_evb_picopicodebug.build.usbpwr=-DUSBD_MAX_POWER_MA=250
 wiznet_6100_evb_picopicodebug.build.board=WIZNET_6100_EVB_PICO
 wiznet_6100_evb_picopicodebug.build.mcu=cortex-m0plus
@@ -17163,7 +17163,7 @@ wiznet_6100_evb_picopicodebug.build.ldscript=memmap_default.ld
 wiznet_6100_evb_picopicodebug.build.ram_length=240k
 wiznet_6100_evb_picopicodebug.build.boot2=boot2_w25q080_2_padded_checksum
 wiznet_6100_evb_picopicodebug.build.vid=0x2e8a
-wiznet_6100_evb_picopicodebug.build.pid=0x1029
+wiznet_6100_evb_picopicodebug.build.pid=0x1046
 wiznet_6100_evb_picopicodebug.build.usb_manufacturer="WIZnet"
 wiznet_6100_evb_picopicodebug.build.usb_product="W6100-EVB-Pico (pico-debug)"
 wiznet_6100_evb_picopicodebug.menu.flash.2097152_0=2MB (no FS)
