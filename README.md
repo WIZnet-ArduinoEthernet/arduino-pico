@@ -13,6 +13,7 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Raspberry Pi Pico
 * Raspberry Pi Pico W
 * Adafruit Feather RP2040
+* Adafruit Feather RP2040 SCORPIO
 * Adafruit ItsyBitsy RP2040
 * Adafruit KB2040
 * Adafruit Macropad RP2040
@@ -23,6 +24,7 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * BridgeTek IDM2040-7A
 * Cytron Maker Pi RP2040
 * Cytron Maker Nano RP2040
+* DatanoiseTV PicoADK+
 * Degz Mizu
 * DeRuiLab FlyBoard2040 Core
 * DFRobot Beetle RP2040
@@ -44,6 +46,11 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * SparkFun ProMicro RP2040
 * SparkFun Thing Plus RP2040
 * uPesy RP2040 DevKit
+* Waveshare RP2040 Zero
+* Waveshare RP2040 One
+* Waveshare RP2040 Plus
+* Waveshare RP2040 LCD 0.96
+* Waveshare RP2040 LCD 1.28
 * WIZnet W5100S-EVB-Pico
 * WIZnet W5500-EVB-Pico
 * WIZnet W6100-EVB-Pico

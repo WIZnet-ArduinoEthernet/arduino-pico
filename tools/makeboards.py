@@ -70,7 +70,7 @@ def BuildBoot(name):
             ("IS25LP080 QSPI /2", "boot2_is25lp080_2_padded_checksum"), ("IS25LP080 QSPI /4", "boot2_is25lp080_4_padded_checksum"),
             ("W25Q080 QSPI /2", "boot2_w25q080_2_padded_checksum"), ("W25Q080 QSPI /4", "boot2_w25q080_4_padded_checksum"),
             ("W25X10CL QSPI /2", "boot2_w25x10cl_2_padded_checksum"), ("W25X10CL QSPI /4", "boot2_w25x10cl_4_padded_checksum"),
-            ("W25Q64JV QSPI /4", "boot2_w25q64jv_4_padded_checksum") ]:
+            ("W25Q64JV QSPI /4", "boot2_w25q64jv_4_padded_checksum"), ("W25Q16JVxQ QSPI /4", "boot2_w25q16jvxq_4_padded_checksum") ]:
         print("%s.menu.boot2.%s=%s" % (name, l[1], l[0]))
         print("%s.menu.boot2.%s.build.boot2=%s" % (name, l[1], l[1]))
 
@@ -110,15 +110,24 @@ def BuildHeader(name, vendor_name, product_name, vidtouse, pidtouse, vid, pid, p
     print("# %s" % (prettyname))
     print("# -----------------------------------")
     print("%s.name=%s" % (name, prettyname))
-    usb = 0;
-    for kb in [ "0", "0x8000" ]:
-        for ms in [ "0", "0x4000" ]:
-            for jy in [ "0", "0x0100" ]:
-                thispid = int(pidtouse, 16) | int(kb, 16) | int(ms, 16) | int(jy, 16)
-                print("%s.vid.%d=%s" % (name, usb, vidtouse))
-                print("%s.pid.%d=0x%04x" % (name, usb, thispid))
-                usb = usb + 1
-    print("%s.build.usbpid=-DSERIALUSB_PID=%s" % (name, pid))
+    usb = 0
+    if type(pidtouse) == list:
+        for tp in pid:
+            print("%s.vid.%d=%s" % (name, usb, vidtouse))
+            print("%s.pid.%d=0x%04x" % (name, usb, int(tp, 16)))
+            usb = usb + 1
+    else:
+        for kb in [ "0", "0x8000" ]:
+            for ms in [ "0", "0x4000" ]:
+                for jy in [ "0", "0x0100" ]:
+                    thispid = int(pidtouse, 16) | int(kb, 16) | int(ms, 16) | int(jy, 16)
+                    print("%s.vid.%d=%s" % (name, usb, vidtouse))
+                    print("%s.pid.%d=0x%04x" % (name, usb, thispid))
+                    usb = usb + 1
+    if type(pid) == list:
+        print("%s.build.usbpid=-DSERIALUSB_PID=%s" % (name, pid[0]))
+    else:
+        print("%s.build.usbpid=-DSERIALUSB_PID=%s" % (name, pid))
     print("%s.build.usbpwr=-DUSBD_MAX_POWER_MA=%s" % (name, pwr))
     print("%s.build.board=%s" % (name, boarddefine))
     print("%s.build.mcu=cortex-m0plus" % (name))
@@ -141,7 +150,10 @@ def BuildHeader(name, vendor_name, product_name, vidtouse, pidtouse, vid, pid, p
     print("%s.build.debugscript=%s" % (name, dbg))
     print("%s.build.boot2=%s" % (name, boot2))
     print("%s.build.vid=%s" % (name, vid))
-    print("%s.build.pid=%s" % (name, pid))
+    if type(pid) == list:
+        print("%s.build.pid=%s" % (name, pid[0]))
+    else:
+        print("%s.build.pid=%s" % (name, pid))
     print('%s.build.usb_manufacturer="%s"' % (name, vendor_name))
     print('%s.build.usb_product="%s"' % (name, product_name))
     if extra != None:
@@ -205,10 +217,9 @@ def MakeBoard(name, vendor_name, product_name, vid, pid, pwr, boarddefine, flash
         BuildExceptions(n)
         BuildDebugPort(n)
         BuildDebugLevel(n)
-        if a == "picodebug":
-            BuildWithoutUSBStack(n)
-        else:
+        if a != "picodebug":
             BuildUSBStack(n)
+        BuildWithoutUSBStack(n)
         if name == "rpipicow":
             BuildCountry(n)
         BuildIPStack(n)
@@ -221,6 +232,8 @@ def MakeBoard(name, vendor_name, product_name, vid, pid, pwr, boarddefine, flash
     pkgjson['packages'][0]['platforms'][0]['boards'].append(thisbrd)
 
 def MakeBoardJSON(name, vendor_name, product_name, vid, pid, pwr, boarddefine, flashsizemb, boot2, extra):
+    if type(pid) == list:
+        pid = pid[0]
     if extra != None:
         m_extra = ' '
         for m_item in extra:
@@ -313,6 +326,7 @@ MakeBoard("rpipicow", "Raspberry Pi", "Pico W", "0x2e8a", "0xf00a", 250, "RASPBE
 
 # Adafruit
 MakeBoard("adafruit_feather", "Adafruit", "Feather RP2040", "0x239a", "0x80f1", 250, "ADAFRUIT_FEATHER_RP2040", 8, "boot2_w25x10cl_4_padded_checksum")
+MakeBoard("adafruit_feather_scorpio", "Adafruit", "Feather RP2040 SCORPIO", "0x239a", "0x8121", 250, "ADAFRUIT_FEATHER_RP2040_SCORPIO", 8, "boot2_w25q080_2_padded_checksum")
 MakeBoard("adafruit_itsybitsy", "Adafruit", "ItsyBitsy RP2040", "0x239a", "0x80fd", 250, "ADAFRUIT_ITSYBITSY_RP2040", 8, "boot2_w25q080_2_padded_checksum")
 MakeBoard("adafruit_qtpy", "Adafruit", "QT Py RP2040", "0x239a", "0x80f7", 250, "ADAFRUIT_QTPY_RP2040", 8, "boot2_w25q080_2_padded_checksum")
 MakeBoard("adafruit_stemmafriend", "Adafruit", "STEMMA Friend RP2040", "0x239a", "0x80e3", 250, "ADAFRUIT_STEMMAFRIEND_RP2040", 8, "boot2_w25q080_2_padded_checksum")
@@ -321,7 +335,7 @@ MakeBoard("adafruit_macropad2040", "Adafruit", "MacroPad RP2040", "0x239a", "0x8
 MakeBoard("adafruit_kb2040", "Adafruit", "KB2040", "0x239a", "0x8105", 250, "ADAFRUIT_KB2040_RP2040", 8, "boot2_w25q080_2_padded_checksum")
 
 # Arduino
-MakeBoard("arduino_nano_connect", "Arduino", "Nano RP2040 Connect", "0x2341", "0x0058", 250, "NANO_RP2040_CONNECT", 16, "boot2_w25q080_2_padded_checksum")
+MakeBoard("arduino_nano_connect", "Arduino", "Nano RP2040 Connect", "0x2341", ["0x005e", "0x805e", "0x015e", "0x025e"] , 250, "NANO_RP2040_CONNECT", 16, "boot2_w25q080_2_padded_checksum")
 
 # BridgeTek
 MakeBoard("bridgetek_idm2040-7a", "BridgeTek", "IDM2040-7A", "0x2e8a", "0x1041", 250, "BRIDGETEK_IDM2040-7A", 8, "boot2_w25q080_2_padded_checksum", ["FT8XX_TYPE=BT817", "DISPLAY_RES=WVGA", "PLATFORM_RP2040"])
@@ -329,6 +343,9 @@ MakeBoard("bridgetek_idm2040-7a", "BridgeTek", "IDM2040-7A", "0x2e8a", "0x1041",
 # Cytron
 MakeBoard("cytron_maker_nano_rp2040", "Cytron", "Maker Nano RP2040", "0x2e8a", "0x100f", 250, "CYTRON_MAKER_NANO_RP2040", 2, "boot2_w25q080_2_padded_checksum")
 MakeBoard("cytron_maker_pi_rp2040", "Cytron", "Maker Pi RP2040", "0x2e8a", "0x1000", 250, "CYTRON_MAKER_PI_RP2040", 2, "boot2_w25q080_2_padded_checksum")
+
+# DatanoiseTV
+MakeBoard("datanoisetv_picoadk", "DatanoiseTV", "PicoADK", "0x2e8a", "0x000a", 250, "DATANOISETV_PICOADK", 2, "boot2_w25q080_2_padded_checksum")
 
 # Degz
 MakeBoard("degz_mizu", "Degz", "Mizu", "0x2e8a", "0x000a", 250, "DEGZ_MIZU", 8, "boot2_generic_03h_4_padded_checksum")
@@ -376,6 +393,13 @@ MakeBoard("upesy_rp2040_devkit", "uPesy", "RP2040 DevKit", "0x2e8a", "0x1007", 2
 # Seeed
 MakeBoard("seeed_xiao_rp2040", "Seeed", "XIAO RP2040", "0x2e8a", "0x000a", 250, "SEEED_XIAO_RP2040", 2, "boot2_w25q080_2_padded_checksum")
 
+# Waveshare
+MakeBoard("waveshare_rp2040_zero", "Waveshare", "RP2040 Zero", "0x2e8a", "0x0003", 500, "WAVESHARE_RP2040_ZERO", 2, "boot2_w25q16jvxq_4_padded_checksum")
+MakeBoard("waveshare_rp2040_one", "Waveshare", "RP2040 One", "0x2e8a", "0x103a", 500, "WAVESHARE_RP2040_ONE", 4, "boot2_w25q16jvxq_4_padded_checksum")
+MakeBoard("waveshare_rp2040_plus_4mb", "Waveshare", "RP2040 Plus 4MB", "0x2e8a", "0x1020", 500, "WAVESHARE_RP2040_PLUS", 4, "boot2_w25q080_2_padded_checksum")
+MakeBoard("waveshare_rp2040_plus_16mb", "Waveshare", "RP2040 Plus 16MB", "0x2e8a", "0x1020", 500, "WAVESHARE_RP2040_PLUS", 16, "boot2_w25q080_2_padded_checksum")
+MakeBoard("waveshare_rp2040_lcd_0_96", "Waveshare", "RP2040 LCD 0.96", "0x2e8a", "0x1021", 500, "WAVESHARE_RP2040_LCD_0_96", 2, "boot2_w25q16jvxq_4_padded_checksum")
+MakeBoard("waveshare_rp2040_lcd_1_28", "Waveshare", "RP2040 LCD 1.28", "0x2e8a", "0x1039", 500, "WAVESHARE_RP2040_LCD_1_28", 2, "boot2_w25q16jvxq_4_padded_checksum")
 # WIZnet
 MakeBoard("wiznet_5100s_evb_pico", "WIZnet", "W5100S-EVB-Pico", "0x2e8a", "0x1027", 250, "WIZNET_5100S_EVB_PICO", 2, "boot2_w25q080_2_padded_checksum")
 MakeBoard("wiznet_wizfi360_evb_pico", "WIZnet", "WizFi360-EVB-Pico", "0x2e8a", "0x1028", 250, "WIZNET_WIZFI360_EVB_PICO", 2, "boot2_w25q080_2_padded_checksum")
