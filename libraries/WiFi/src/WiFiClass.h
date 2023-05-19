@@ -368,7 +368,8 @@ public:
 
     unsigned long getTime();
 
-    void lowPowerMode();
+    void aggressiveLowPowerMode();
+    void defaultLowPowerMode();
     void noLowPowerMode();
 
     int ping(const char* hostname, uint8_t ttl = 128);
@@ -381,7 +382,7 @@ public:
     void feedWatchdog();
 
 private:
-    int _timeout = 10000;
+    int _timeout = 15000;
     String _ssid;
     String _password;
     bool _wifiHWInitted = false;
