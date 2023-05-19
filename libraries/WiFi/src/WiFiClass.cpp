@@ -96,6 +96,8 @@ int WiFiClass::begin(const char* ssid, const char *passphrase) {
     if (!_wifi.begin()) {
         return WL_IDLE_STATUS;
     }
+    // Enable CYW43 event debugging (make sure Debug Port is set)
+    //cyw43_state.trace_flags = 0xffff;
     while (!_calledESP && ((millis() - start < (uint32_t)2 * _timeout)) && !connected()) {
         delay(10);
     }
@@ -152,7 +154,7 @@ uint8_t WiFiClass::beginAP(const char *ssid, const char* passphrase) {
 #endif
 
 bool WiFiClass::connected() {
-    return (_apMode && _wifiHWInitted) || (_wifi.connected() && localIP().isSet());
+    return (_apMode && _wifiHWInitted) || (_wifi.connected() && localIP().isSet() && (cyw43_wifi_link_status(&cyw43_state, _apMode ? 1 : 0) == CYW43_LINK_JOIN));
 }
 
 /*  Change Ip configuration settings disabling the dhcp client
@@ -222,6 +224,9 @@ void WiFiClass::setDNS(IPAddress dns_server1, IPAddress dns_server2) {
 */
 void WiFiClass::setHostname(const char* name) {
     _wifi.setHostname(name);
+}
+const char *WiFiClass::getHostname() {
+    return _wifi.getHostname();
 }
 
 /*
