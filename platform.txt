@@ -20,7 +20,7 @@
 # https://github.com/arduino/Arduino/wiki/Arduino-IDE-1.5---3rd-party-Hardware-specification
 
 name=Raspberry Pi RP2040 Boards
-version=2.6.1
+version=2.6.2
 
 runtime.tools.pqt-gcc.path={runtime.platform.path}/system/arm-none-eabi
 runtime.tools.pqt-python3.path={runtime.platform.path}/system/python3
@@ -165,12 +165,6 @@ debug.server.openocd.scripts_dir={runtime.tools.pqt-openocd.path}/share/openocd/
 debug.server.openocd.script={runtime.platform.path}/lib/{build.debugscript}
 
 
-
-upload.tool.uf2conv=uf2conv
-upload.tool.serial=uf2conv
-upload.tool.network=uf2conv-network
-upload.tool.picoprobe=picoprobe
-upload.tool.picodebug=picodebug
 
 tools.uf2conv.path=
 # Because the variable expansion doesn't allow one tool to find another, the following lines

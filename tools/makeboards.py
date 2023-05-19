@@ -69,7 +69,8 @@ def BuildBoot(name):
     for l in [ ("Generic SPI /2", "boot2_generic_03h_2_padded_checksum"),  ("Generic SPI /4", "boot2_generic_03h_4_padded_checksum"),
             ("IS25LP080 QSPI /2", "boot2_is25lp080_2_padded_checksum"), ("IS25LP080 QSPI /4", "boot2_is25lp080_4_padded_checksum"),
             ("W25Q080 QSPI /2", "boot2_w25q080_2_padded_checksum"), ("W25Q080 QSPI /4", "boot2_w25q080_4_padded_checksum"),
-            ("W25X10CL QSPI /2", "boot2_w25x10cl_2_padded_checksum"), ("W25X10CL QSPI /4", "boot2_w25x10cl_4_padded_checksum") ]:
+            ("W25X10CL QSPI /2", "boot2_w25x10cl_2_padded_checksum"), ("W25X10CL QSPI /4", "boot2_w25x10cl_4_padded_checksum"),
+            ("W25Q64JV QSPI /4", "boot2_w25q64jv_4_padded_checksum") ]:
         print("%s.menu.boot2.%s=%s" % (name, l[1], l[0]))
         print("%s.menu.boot2.%s.build.boot2=%s" % (name, l[1], l[1]))
 
@@ -102,7 +103,7 @@ def BuildIPStack(name):
     print('%s.menu.ipstack.ipv4ipv6.build.libpico=libpico-ipv6.a' % (name))
     print('%s.menu.ipstack.ipv4ipv6.build.lwipdefs=-DLWIP_IPV6=1 -DLWIP_IPV4=1' % (name))
 
-def BuildHeader(name, vendor_name, product_name, vidtouse, pidtouse, vid, pid, pwr, boarddefine, variant, uploadtool, flashsize, ramsize, boot2, dbg, extra):
+def BuildHeader(name, vendor_name, product_name, vidtouse, pidtouse, vid, pid, pwr, boarddefine, variant, uploadtool, networkuploadtool, flashsize, ramsize, boot2, dbg, extra):
     prettyname = vendor_name + " " + product_name
     print()
     print("# -----------------------------------")
@@ -123,6 +124,9 @@ def BuildHeader(name, vendor_name, product_name, vidtouse, pidtouse, vid, pid, p
     print("%s.build.mcu=cortex-m0plus" % (name))
     print("%s.build.variant=%s" % (name, variant))
     print("%s.upload.tool=%s" % (name, uploadtool))
+    print("%s.upload.tool.default=%s" % (name, uploadtool))
+    if networkuploadtool != None:
+        print("%s.upload.tool.network=%s" % (name, networkuploadtool))
     print("%s.upload.maximum_size=%d" % (name, flashsize))
     print("%s.upload.maximum_data_size=%d" % (name, ramsize))
     print("%s.upload.wait_for_upload_port=true" % (name))
@@ -168,7 +172,7 @@ def BuildGlobalMenuList():
     print("menu.ipstack=IP Stack")
 
 def MakeBoard(name, vendor_name, product_name, vid, pid, pwr, boarddefine, flashsizemb, boot2, extra = None):
-    for a, b, c in [ ["", "", "uf2conv"], ["picoprobe", " (Picoprobe)", "picoprobe"], ["picodebug", " (pico-debug)", "picodebug"]]:
+    for a, b, c, d in [ ["", "", "uf2conv", "uf2conv-network"], ["picoprobe", " (Picoprobe)", "picoprobe", None], ["picodebug", " (pico-debug)", "picodebug", None]]:
         n = name + a
         p = product_name + b
         fssizelist = [ 0, 64 * 1024, 128 * 1024, 256 * 1024, 512 * 1024 ]
@@ -186,7 +190,7 @@ def MakeBoard(name, vendor_name, product_name, vid, pid, pwr, boarddefine, flash
             dbg = "picodebug.tcl"
         else:
             pidtouse = pid
-        BuildHeader(n, vendor_name, p, vidtouse, pidtouse, vid, pid, pwr, boarddefine, name, c, flashsizemb * 1024 * 1024, ramsizekb * 1024, boot2, dbg, extra)
+        BuildHeader(n, vendor_name, p, vidtouse, pidtouse, vid, pid, pwr, boarddefine, name, c, d, flashsizemb * 1024 * 1024, ramsizekb * 1024, boot2, dbg, extra)
         if name == "generic":
             BuildFlashMenu(n, 2*1024*1024, [0, 1*1024*1024])
             BuildFlashMenu(n, 4*1024*1024, [0, 2*1024*1024])
@@ -355,6 +359,9 @@ MakeBoard("ilabs_rpico32", "iLabs", "RPICO32", "0x2e8a", "0x1010", 250, "ILABS_2
 # Melopero
 MakeBoard("melopero_cookie_rp2040", "Melopero", "Cookie RP2040", "0x2e8a", "0x1011", 250, "MELOPERO_COOKIE_RP2040", 8, "boot2_w25q080_2_padded_checksum")
 MakeBoard("melopero_shake_rp2040", "Melopero", "Shake RP2040", "0x2e8a", "0x1005", 250, "MELOPERO_SHAKE_RP2040", 16, "boot2_w25q080_2_padded_checksum")
+
+# Pimoroni
+MakeBoard("pimoroni_pga2040", "Pimoroni", "PGA2040", "0x2e8a", "0x1008", 250, "PIMORONI_PGA2040", 8, "boot2_w25q64jv_4_padded_checksum")
 
 # Solder Party
 MakeBoard("solderparty_rp2040_stamp", "Solder Party", "RP2040 Stamp", "0x1209", "0xa182", 500, "SOLDERPARTY_RP2040_STAMP", 8, "boot2_generic_03h_4_padded_checksum")
