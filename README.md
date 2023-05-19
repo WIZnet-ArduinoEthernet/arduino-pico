@@ -20,8 +20,10 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Adafruit STEMMA Friend RP2040
 * Adafruit Trinkey RP2040 QT
 * Arduino Nano RP2040 Connect
+* BridgeTek IDM2040-7A
 * Cytron Maker Pi RP2040
 * Cytron Maker Nano RP2040
+* Degz Mizu
 * DeRuiLab FlyBoard2040 Core
 * DFRobot Beetle RP2040
 * ElectronicCats Hunter Cat NFC
@@ -34,6 +36,7 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Invector Labs Challenger RP2040 SubGHz
 * Invector Labs Challenger RP2040 SD/RTC
 * Invector Labs RPICO32
+* Melopero Cookie RP2040
 * Melopero Shake RP2040
 * Seeed XIAO RP2040
 * Solder Party RP2040 Stamp

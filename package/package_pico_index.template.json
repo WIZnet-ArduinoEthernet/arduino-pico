@@ -48,10 +48,16 @@
                      "name": "Arduino Nano RP2040 Connect"
                   },
                   {
+                     "name": "BridgeTek IDM2040-7A"
+                  },
+                  {
                      "name": "Cytron Maker Nano RP2040"
                   },
                   {
                      "name": "Cytron Maker Pi RP2040"
+                  },
+                  {
+                     "name": "Degz Mizu"
                   },
                   {
                      "name": "DeRuiLab FlyBoard2040Core"
@@ -91,6 +97,9 @@
                   },
                   {
                      "name": "iLabs RPICO32"
+                  },
+                  {
+                     "name": "Melopero Cookie RP2040"
                   },
                   {
                      "name": "Melopero Shake RP2040"
