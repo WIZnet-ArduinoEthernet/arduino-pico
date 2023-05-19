@@ -1,3 +1,24 @@
+/*
+    Arduino OTA.cpp - Simple Arduino IDE OTA handler
+    Modified 2022 Earle F. Philhower, III.  All rights reserved.
+
+    Taken from the ESP8266 core libraries, (c) various authors.
+
+    This library is free software; you can redistribute it and/or
+    modify it under the terms of the GNU Lesser General Public
+    License as published by the Free Software Foundation; either
+    version 2.1 of the License, or (at your option) any later version.
+
+    This library is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+    Lesser General Public License for more details.
+
+    You should have received a copy of the GNU Lesser General Public
+    License along with this library; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
 #include <functional>
 #include <WiFiUdp.h>
 #include "ArduinoOTA.h"
@@ -89,7 +110,7 @@ void ArduinoOTAClass::begin(bool useMDNS) {
     _useMDNS = useMDNS;
 
     if (!_hostname.length()) {
-        char tmp[15];
+        char tmp[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 6];
         sprintf(tmp, "pico-%s", rp2040.getChipID());
         _hostname = tmp;
     }
@@ -243,6 +264,19 @@ void ArduinoOTAClass::_onRx() {
 void ArduinoOTAClass::_runUpdate() {
     IPAddress ota_ip = _ota_ip;
 
+    if (!LittleFS.begin()) {
+#ifdef OTA_DEBUG
+        OTA_DEBUG.println("LittleFS Begin Error");
+#endif
+        _udp_ota->append("ERR: ", 5);
+        _udp_ota->append("No Filesystem", 13);
+        _udp_ota->send(ota_ip, _ota_udp_port);
+        delay(100);
+        _udp_ota->listen(IP_ADDR_ANY, _port);
+        _state = OTA_IDLE;
+        return;
+    }
+
     if (!Update.begin(_size, _cmd)) {
 #ifdef OTA_DEBUG
         OTA_DEBUG.println("Update Begin Error");
@@ -255,15 +289,6 @@ void ArduinoOTAClass::_runUpdate() {
         Update.printError(ss);
         _udp_ota->append("ERR: ", 5);
         _udp_ota->append(ss.c_str(), ss.length());
-        _udp_ota->send(ota_ip, _ota_udp_port);
-        delay(100);
-        _udp_ota->listen(IP_ADDR_ANY, _port);
-        _state = OTA_IDLE;
-        return;
-    }
-    if (!LittleFS.begin()) {
-        _udp_ota->append("ERR: ", 5);
-        _udp_ota->append("nofilesystem", 6);
         _udp_ota->send(ota_ip, _ota_udp_port);
         delay(100);
         _udp_ota->listen(IP_ADDR_ANY, _port);

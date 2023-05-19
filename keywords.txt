@@ -2,6 +2,8 @@
 # Syntax Coloring Map
 #######################################
 
+Arduino	KEYWORD3		RESERVED_WORD
+
 #######################################
 # Datatypes (KEYWORD1)
 #######################################
@@ -30,14 +32,34 @@ usToPIOCycles	KEYWORD2
 f_cpu	KEYWORD2
 getCycleCount	KEYWORD2
 getCycleCount64	KEYWORD2
+
+getFreeHeap	KEYWORD2
+getUsedHeap	KEYWORD2
+getTotalHeap	KEYWORD2
+
 idleOtherCore	KEYWORD2
 resumeOtherCore	KEYWORD2
+
+restartCore1	KEYWORD2
+reboot	KEYWORD2
+restart	KEYWORD2
+
+isPicoW	KEYWORD2
+
+getChipID	KEYWORD2
+
+hwrand32	KEYWORD2
 
 PIOProgram	KEYWORD2
 prepare	KEYWORD2
 SerialPIO	KEYWORD2
 setFIFOSize	KEYWORD2
 setPollingMode	KEYWORD2
+
+digitalWriteFast	KEYWORD2
+digitalReadFast	KEYWORD2
+
+enableDoubleResetBootloader	KEYWORD2
 
 OUTPUT_2MA	LITERAL1
 OUTPUT_4MA	LITERAL1

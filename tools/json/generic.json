@@ -42,11 +42,13 @@
     "wait_for_upload_port": false,
     "protocol": "picotool",
     "protocols": [
+      "blackmagic",
       "cmsis-dap",
       "jlink",
       "raspberrypi-swd",
       "picotool",
-      "picoprobe"
+      "picoprobe",
+      "pico-debug"
     ]
   },
   "url": "https://www.raspberrypi.org/products/raspberry-pi-pico/",

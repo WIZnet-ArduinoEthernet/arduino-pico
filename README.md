@@ -9,10 +9,15 @@ This is a port of the RP2040 (Raspberry Pi Pico processor) to the Arduino ecosys
 # Documentation
 See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for more detailed usage information.
 
+# Contributing
+Read the [Contributing Guide](https://github.com/earlephilhower/arduino-pico/blob/master/docs/contrib.rst) for more information on submitting pull requests and porting libraries or sketches to this core.
+
 # Supported Boards
 * Raspberry Pi Pico
 * Raspberry Pi Pico W
+* 0xCB Helios
 * Adafruit Feather RP2040
+* Adafruit Feather RP2040 SCORPIO
 * Adafruit ItsyBitsy RP2040
 * Adafruit KB2040
 * Adafruit Macropad RP2040
@@ -20,11 +25,14 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Adafruit STEMMA Friend RP2040
 * Adafruit Trinkey RP2040 QT
 * Arduino Nano RP2040 Connect
+* BridgeTek IDM2040-7A
 * Cytron Maker Pi RP2040
 * Cytron Maker Nano RP2040
+* DatanoiseTV PicoADK+
 * DeRuiLab FlyBoard2040 Core
 * DFRobot Beetle RP2040
 * ElectronicCats Hunter Cat NFC
+* ExtremeElectronics RC2040
 * Invector Labs Challenger RP2040 WiFi
 * Invector Labs Challenger RP2040 WiFi/BLE
 * Invector Labs Challenger NB RP2040 WiFi
@@ -32,13 +40,26 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Invector Labs Challenger RP2040 LoRa
 * Invector Labs Challenger RP2040 SubGHz
 * Invector Labs Challenger RP2040 SD/RTC
+* Invector Labs Challenger RP2040 UWB
 * Invector Labs RPICO32
+* Melopero Cookie RP2040
 * Melopero Shake RP2040
+* Neko Systems BL2040 Mini
+* nullbits Bit-C PRO
+* Pimoroni PGA2040
+* Seeed Indicator RP2040
 * Seeed XIAO RP2040
 * Solder Party RP2040 Stamp
 * SparkFun ProMicro RP2040
 * SparkFun Thing Plus RP2040
 * uPesy RP2040 DevKit
+* VCC-GND YD-RP2040
+* Viyalab Mizu RP2040
+* Waveshare RP2040 Zero
+* Waveshare RP2040 One
+* Waveshare RP2040 Plus
+* Waveshare RP2040 LCD 0.96
+* Waveshare RP2040 LCD 1.28
 * WIZnet W5100S-EVB-Pico
 * WIZnet W5500-EVB-Pico
 * WIZnet W6100-EVB-Pico
@@ -46,13 +67,33 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Generic (configurable flash, I/O pins)
 
 # Installing via Arduino Boards Manager
-**Windows Users**: Please do not use the Windows Store version of the actual Arduino application
+## Windows-specific Notes
+Please do not use the Windows Store version of the actual Arduino application
 because it has issues detecting attached Pico boards.  Use the "Windows ZIP" or plain "Windows"
 executable (EXE)  download direct from https://arduino.cc. and allow it to install any device
 drivers it suggests.  Otherwise the Pico board may not be detected.  Also, if trying out the
 2.0 beta Arduino please install the release 1.8 version beforehand to ensure needed device drivers
 are present.  (See #20 for more details.)
 
+## Linux-specific Notes
+Installing Arduino using flatpak (often used by "App Stores" in various Linux
+distributions) will mean it has restricted access to the host. This might cause uploads to fail
+with error messages such as the following:
+
+```
+Scanning for RP2040 devices
+...
+No drive to deploy.
+```
+
+If you encounter this, you will need to either install Arduino in a different manner, or override
+the flatpak sandboxing feature using the following command, then restarting Arduino.
+
+```
+flatpak override --user --filesystem=host:ro cc.arduino.IDE2
+```
+
+## Installation
 Open up the Arduino IDE and go to File->Preferences.
 
 In the dialog that pops up, enter the following URL in the "Additional Boards Manager URLs" field:
@@ -70,6 +111,12 @@ Type "pico" in the search box and select "Add":
 ![image](https://user-images.githubusercontent.com/11875/111917223-12063680-8a3c-11eb-8884-4f32b8f0feb1.png)
 
 # Installing via GIT
+
+**Windows Users:**  Before installing via `git` on Windows, please read and follow the directions in
+[this link](https://arduino-pico.readthedocs.io/en/latest/platformio.html#important-steps-for-windows-users-before-installing).
+If Win32 long paths are not enabled, and `git` not configured to use them then there
+may be errors when attempting to clone the submodules.
+
 To install via GIT (for latest and greatest versions):
 ````
 mkdir -p ~/Arduino/hardware/pico
@@ -146,14 +193,20 @@ The installed tools include a version of OpenOCD (in the pqt-openocd directory) 
 
 # Features
 * Adafruit TinyUSB Arduino (USB mouse, keyboard, flash drive, generic HID, CDC Serial, MIDI, WebUSB, others)
-* Generic Arduino USB Serial, Keyboard, and Mouse emulation
+* Bluetooth on the PicoW (Classic and BLE) with Keyboard, Mouse, Joystick, and Virtual Serial
+* Generic Arduino USB Serial, Keyboard, Joystick, and Mouse emulation
 * WiFi (Pico W)
+* HTTP client and server (WebServer)
+* SSL/TLS/HTTPS
 * Over-the-Air (OTA) upgrades
 * Filesystems (LittleFS and SD/SDFS)
 * Multicore support (setup1() and loop1())
 * FreeRTOS SMP support
 * Overclocking and underclocking from the menus
 * digitalWrite/Read, shiftIn/Out, tone, analogWrite(PWM)/Read, temperature
+* Analog stereo audio in using DMA and the built-in ADC
+* Analog stereo audio out using PWM hardware
+* USB drive mode for data loggers (SingleFileDrive)
 * Peripherals:  SPI master, Wire(I2C) master/slave, dual UART, emulated EEPROM, I2S audio input, I2S audio output, Servo
 * printf (i.e. debug) output over USB serial
 
@@ -171,6 +224,10 @@ Here are some links to coverage and additional tutorials for using `arduino-pico
 * Pre-release Adafruit QT Py RP2040 - https://www.youtube.com/watch?v=sfC1msqXX0I
 * Adafruit Feather RP2040 running LCD + TMP117 - https://www.youtube.com/watch?v=fKDeqZiIwHg
 * Demonstration of Servos and I2C in Korean - https://cafe.naver.com/arduinoshield/1201
+* Home Assistant Pico W integration starter project using Arduino - https://github.com/daniloc/PicoW_HomeAssistant_Starter
+* Tutorials for the Raspberry Pi Pico / uPesy RP2040 DevKit board 
+    - English version: https://www.upesy.com/blogs/tutorials/best-tutorials-for-rpi-pi-pico-with-arduino-code
+    - French version: https://www.upesy.fr/blogs/tutorials/best-tutorials-for-rpi-pi-pico-with-arduino-code
 
 # Contributing
 If you want to contribute or have bugfixes, drop me a note at <earlephilhower@yahoo.com> or open an issue/PR here.
@@ -188,7 +245,10 @@ If you want to contribute or have bugfixes, drop me a note at <earlephilhower@ya
 * [lwIP](https://savannah.nongnu.org/projects/lwip/) is (c) the Swedish Institute of Computer Science and licenced under the BSD license.
 * [BearSSL](https://bearssl.org) library written by Thomas Pornin, is distributed under the [MIT License](https://bearssl.org/#legal-details).
 * [UZLib](https://github.com/pfalcon/uzlib) is copyright (c) 2003 Joergen Ibsen and distributed under the zlib license.
-* [LEAmDMS](https://github.com/LaborEtArs/ESP8266mDNS) is copyright multiple authors and distributed under the MIT license.
+* [LEAmDNS](https://github.com/LaborEtArs/ESP8266mDNS) is copyright multiple authors and distributed under the MIT license.
+* [http-parser](https://github.com/nodejs/http-parser) is copyright Joyent, Inc. and other Node contributors.
+* WebServer code modified from the [ESP32 WebServer](https://github.com/espressif/arduino-esp32/tree/master/libraries/WebServer) and is copyright (c) 2015 Ivan Grokhotkov and others
+
 
 -Earle F. Philhower, III  
  earlephilhower@yahoo.com

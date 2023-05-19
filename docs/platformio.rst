@@ -23,6 +23,46 @@ Especially useful is the `Getting started with VSCode + PlatformIO <https://docs
 
 Hereafter it is assumed that you have a basic understanding of PlatformIO in regards to project creation, project file structure and building and uploading PlatformIO projects, through reading the above pages.
 
+Important steps for Windows users, before installing
+----------------------------------------------------
+
+By default, Windows has a limited path length that is not long enough to fully clone the ``Pico-SDK``'s ``tinyusb`` repository, resulting in error messages like the one below while attempting to fetch the repository.
+
+.. code::
+
+    error: unable to create file '.....' : Filename too long
+    
+To work around this requires performing two steps and rebooting Windows once.  These steps will enable longer file paths at the Windows OS and the ``git`` level.
+
+Step 1: Enabling long paths in git
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Open up a Windows ``cmd`` or ``terminal`` window and execute the following command
+
+.. code::
+
+    git config --system core.longpaths true 
+
+Step 2: Enabling long paths in the Windows OS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+(taken from https://www.microfocus.com/documentation/filr/filr-4/filr-desktop/t47bx2ogpfz7.html)
+
+1. Click Window key and type gpedit.msc, then press the Enter key. This launches the Local Group Policy Editor.
+
+2. Navigate to Local Computer Policy > Computer Configuration > Administrative Templates > System > Filesystem.
+
+3.  Double click Enable NTFS/Win32 long paths and close the dialog.
+
+   .. image:: images/longpath.png
+
+
+Step 3: Reboot the computer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Once the two prior stages are complete, please do a full reboot or power cycle so that the new settings will take effect.
+
+
 Current state of development
 ----------------------------
 
@@ -234,6 +274,17 @@ The lwIP stack can be configured to support only IPv4 (default) or additionally 
 
 to the ``platformio.ini``.
 
+Bluetooth Stack
+---------------
+
+The Bluetooth Classic (BTC) and Bluetooth Low Energy (BLE) stack can be activated by adding
+
+.. code:: ini
+
+    ; BTC and BLE
+    build_flags = -DPIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH
+
+to the ``platformio.ini``.
 
 Selecting a different core version
 ----------------------------------
@@ -290,16 +341,45 @@ To specify the debugging adapter, use ``debug_tool`` (`documentation <https://do
 * ``cmsis-dap``
 * ``jlink``
 * ``raspberrypi-swd``
+* ``blackmagic``
+* ``pico-debug``
 
 These values can also be used in ``upload_protocol`` if you want PlatformIO to upload the regular firmware through this method, which you likely want.
 
-Especially the PicoProbe method is convenient when you have two Raspberry Pi Pico boards. One of them can be flashed with the PicoProbe firmware (`documentation <https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html#debugging-using-another-raspberry-pi-pico>`_) and is then connected to the target Raspberry Pi Pico board (see `documentation <https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf>`_ chapter "Picoprobe Wiring"). Remember that on Windows, you have to use `Zadig <https://zadig.akeo.ie/>`_ to also load "WinUSB" drivers for the "Picoprobe (Interface 2)" device so that OpenOCD can speak to it.
+Especially the PicoProbe method is convenient when you have two Raspberry Pi Pico boards. One of them can be flashed with the PicoProbe firmware (`documentation <https://www.raspberrypi.com/documentation/microcontrollers/raspberry-pi-pico.html#debugging-using-another-raspberry-pi-pico>`__) and is then connected to the target Raspberry Pi Pico board (see `documentation <https://datasheets.raspberrypi.com/pico/getting-started-with-pico.pdf>`__ chapter "Picoprobe Wiring"). Remember that on Windows, you have to use `Zadig <https://zadig.akeo.ie/>`_ to also load "WinUSB" drivers for the "Picoprobe (Interface 2)" device so that OpenOCD can speak to it.
+
+.. note::
+    Newer PicoProbe firmware versions have dropped the proprietary "PicoProbe" USB communication protocol and emulate a **CMSIS-DAP** instead. Meaning, you have to use ``debug_tool = cmsis-dap`` for these newer firmwares, such as those obtained from `raspberrypi/picoprobe <https://github.com/raspberrypi/picoprobe/releases>`__
 
 With that set up, debugging can be started via the left debugging sidebar and works nicely: Setup breakpoints, inspect the value of variables in the code, step through the code line by line. When a breakpoint is hit or execution is halted, you can even see the execution state both Cortex-M0+ cores of the RP2040.
 
 .. image:: images/pio_debugging.png
 
 For further information on customizing debug options, like the initial breakpoint or debugging / SWD speed, consult `the documentation <https://docs.platformio.org/en/latest/projectconf/section_env_debug.html>`_.
+
+.. note:: 
+    For the BlackMagicProbe debugging probe (as can be e.g., created by simply flashing a STM32F103C8 "Bluepill" board), you currently have to use the branch ``fix/rp2040-flash-reliability`` (or at least commit ``1d001bc``) **and** use the `official ARM provided toolchain <https://github.com/blackmagic-debug/blackmagic/issues/1364#issuecomment-1503393266>`_.
+
+    You can obtain precompiled binaries from `here <https://github.com/blackmagic-debug/blackmagic/issues/1364#issuecomment-1503372723>`__. A flashing guide is available `here <https://primalcortex.wordpress.com/2017/06/13/building-a-black-magic-debug-probe/>`__. You then have to configure the target serial port ("GDB port") in your project per `documentation <https://docs.platformio.org/en/latest/plus/debug-tools/blackmagic.html#debugging-tool-blackmagic>`__.
+
+.. note:: 
+    For the pico-debug (`download <https://github.com/majbthrd/pico-debug/releases>`__) debugging way, *which needs to no additional debug probe*, add this snippet to your ``platformio.ini`` and follow the given procedure:
+
+    .. code:: ini
+
+        upload_protocol = pico-debug
+        debug_tool = pico-debug
+        build_flags = -DPIO_FRAMEWORK_ARDUINO_NO_USB
+
+    1. Build your firmware normally
+    2. Plug in the Pico in BOOTSEL mode
+    3. Drag and drop your ``.pio/build/<env>/firmware.uf2`` onto the boot drive
+    4. Unplug and replug your Pico back into BOOTSEL mode for the second time
+    5. Drag and drop the downloaded ``pico-debug-gimmecache.uf2`` file onto the boot drive
+    6. A CMSIS-DAP device should now appear on your computer
+    7. Start debugging via the debug sidebar as normal
+
+    Note the restrictions: The second core cannot be used, the USB port cannot be used (no USB serial, only UART serial), 16KB less RAM is available.
 
 Filesystem Uploading
 --------------------
@@ -315,3 +395,7 @@ The files you want to upload should be placed in a folder called ``data`` inside
 The task "Build Filesystem Image" will take all files in the data directory and create a ``littlefs.bin`` file from it using the ``mklittlefs`` tool.
 
 The task "Upload Filesystem Image" will upload the filesystem image to the Pico via the specified ``upload_protocol``. 
+
+.. note:: 
+    Set the space available for the filesystem in the ``platformio.ini`` using e.g., ``board_build.filesystem_size = 0.5m``, or filesystem
+    creation will fail!

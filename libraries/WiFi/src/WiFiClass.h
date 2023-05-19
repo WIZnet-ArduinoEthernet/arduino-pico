@@ -35,7 +35,7 @@
 
 typedef void(*FeedHostProcessorWatchdogFuncPointer)();
 
-typedef enum { WIFI_STA, WIFI_AP, WIFI_OFF } _wifiModeESP; // For ESP8266 compatibility
+typedef enum { WIFI_OFF = 0, WIFI_STA = 1, WIFI_AP = 2, WIFI_AP_STA = 3 } WiFiMode_t; // For ESP8266 compatibility
 
 class WiFiClass {
 public:
@@ -46,13 +46,25 @@ public:
     */
     static const char* firmwareVersion();
 
-    void mode(_wifiModeESP m); // For ESP8266 compatibility
+    void mode(WiFiMode_t m); // For ESP8266 compatibility
+
+    WiFiMode_t getMode() {
+        if (_wifiHWInitted) {
+            if (_apMode) {
+                return WiFiMode_t::WIFI_AP;
+            } else {
+                return WiFiMode_t::WIFI_STA;
+            }
+        }
+        return WiFiMode_t::WIFI_OFF;
+    };
 
     /*  Start WiFi connection for OPEN networks
 
         param ssid: Pointer to the SSID string.
     */
     int begin(const char* ssid);
+    int beginBSSID(const char* ssid, const uint8_t *bssid);
 
     /*  Start WiFi connection with WEP encryption.
         Configure a key into the device. The key type (WEP-40, WEP-104)
@@ -71,10 +83,14 @@ public:
         param ssid: Pointer to the SSID string.
         param passphrase: Passphrase. Valid characters in a passphrase
               must be between ASCII 32-126 (decimal).
+        param bssid: If non-null, the BSSID associated w/the SSID to connect to
     */
-    int begin(const char* ssid, const char *passphrase);
+    int begin(const char* ssid, const char *passphrase, const uint8_t *bssid = nullptr);
 
     bool connected();
+    bool isConnected() {
+        return connected();
+    }
     int8_t waitForConnectResult(unsigned long timeoutLength = 60000) {
         uint32_t now = millis();
         while (millis() - now < timeoutLength) {
@@ -90,6 +106,57 @@ public:
     uint8_t beginAP(const char *ssid, uint8_t channel);
     uint8_t beginAP(const char *ssid, const char* passphrase);
     uint8_t beginAP(const char *ssid, const char* passphrase, uint8_t channel);
+
+    // ESP8266 compatible calls
+    bool softAP(const char* ssid, const char* psk = nullptr, int channel = 1, int ssid_hidden = 0, int max_connection = 4) {
+        (void) ssid_hidden;
+        (void) max_connection;
+        return beginAP(ssid, psk, channel) == WL_CONNECTED;
+    }
+
+    bool softAP(const String& ssid, const String& psk = "", int channel = 1, int ssid_hidden = 0, int max_connection = 4) {
+        (void) ssid_hidden;
+        (void) max_connection;
+        if (psk != "") {
+            return beginAP(ssid.c_str(), psk.c_str(), channel) == WL_CONNECTED;
+        } else {
+            return beginAP(ssid.c_str(), channel) == WL_CONNECTED;
+        }
+    }
+
+    bool softAPConfig(IPAddress local_ip, IPAddress gateway, IPAddress subnet) {
+        config(local_ip, local_ip, gateway, subnet);
+        return true;
+    }
+
+    bool softAPdisconnect(bool wifioff = false) {
+        (void) wifioff;
+        disconnect();
+        return true;
+    }
+
+    uint8_t softAPgetStationNum();
+
+    IPAddress softAPIP() {
+        return localIP();
+    }
+
+    uint8_t* softAPmacAddress(uint8_t* mac) {
+        return macAddress(mac);
+    }
+
+    String softAPmacAddress(void) {
+        uint8_t mac[8];
+        macAddress(mac);
+        char buff[32];
+        sprintf(buff, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        return String(buff);
+    }
+
+    String softAPSSID() {
+        return SSID();
+    }
+
 
     // TODO - EAP is not supported by the driver.  Maybe some way of user-level wap-supplicant in the future?
     //uint8_t beginEnterprise(const char* ssid, const char* username, const char* password);
@@ -147,13 +214,14 @@ public:
 
     */
     void setHostname(const char* name);
+    const char *getHostname();
 
     /*
         Disconnect from the network
 
         return: one value of wl_status_t enum
     */
-    int disconnect(void);
+    int disconnect(bool wifi_off = false);
 
     void end(void);
 
@@ -163,6 +231,13 @@ public:
         return: pointer to uint8_t array with length WL_MAC_ADDR_LENGTH
     */
     uint8_t* macAddress(uint8_t* mac);
+    String macAddress(void) {
+        uint8_t mac[8];
+        macAddress(mac);
+        char buff[32];
+        sprintf(buff, "%02x:%02x:%02x:%02x:%02x:%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        return String(buff);
+    }
 
     /*
         Get the interface IP address.
@@ -190,7 +265,7 @@ public:
 
         return: ssid string
     */
-    const char* SSID();
+    const String &SSID();
 
     /*
         Return the current BSSID associated with the network.
@@ -208,6 +283,10 @@ public:
     */
     int32_t RSSI();
 
+
+    /* Return the current network channel */
+    int channel();
+
     /*
         Return the Encryption Type associated with the network
 
@@ -218,9 +297,23 @@ public:
     /*
         Start scan WiFi networks available
 
+        param async: whether to perform asynchronous scan
+
         return: Number of discovered networks
     */
-    int8_t scanNetworks();
+    int8_t scanNetworks(bool async = false);
+
+    /*
+        Return number of scanned WiFi networks
+
+        return: Number of discovered networks
+    */
+    int8_t scanComplete();
+
+    /*
+        Delete scan results
+    */
+    void scanDelete();
 
     /*
         Return the SSID discovered during the network scan.
@@ -280,7 +373,8 @@ public:
 
     unsigned long getTime();
 
-    void lowPowerMode();
+    void aggressiveLowPowerMode();
+    void defaultLowPowerMode();
     void noLowPowerMode();
 
     int ping(const char* hostname, uint8_t ttl = 128);
@@ -292,10 +386,20 @@ public:
     void setFeedWatchdogFunc(FeedHostProcessorWatchdogFuncPointer func);
     void feedWatchdog();
 
+    // ESP8266 compatibility
+    void persistent(bool unused) {
+        (void) unused;
+    }
+
+    void hostname(const char *name) {
+        setHostname(name);
+    }
+
 private:
-    int _timeout = 10000;
-    const char * _ssid = nullptr;
-    const char * _password = nullptr;
+    int _timeout = 15000;
+    String _ssid;
+    uint8_t _bssid[6];
+    String _password;
     bool _wifiHWInitted = false;
     bool _apMode = false;
 
@@ -308,7 +412,7 @@ private:
 
     // ESP compat
     bool _calledESP = false; // Should we behave like the ESP8266 for connect?
-    _wifiModeESP _modeESP = WIFI_STA;
+    WiFiMode_t _modeESP = WIFI_STA;
 };
 
 extern WiFiClass WiFi;

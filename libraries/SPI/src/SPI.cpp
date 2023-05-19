@@ -125,7 +125,7 @@ uint16_t SPIClassRP2040::transfer16(uint16_t data) {
     spi_set_format(_spi, 16, cpol(), cpha(), SPI_MSB_FIRST);
     DEBUGSPI("SPI::transfer16(%04x), cpol=%d, cpha=%d\n", data, cpol(), cpha());
     spi_write16_read16_blocking(_spi, &data, &ret, 1);
-    ret = (_spis.getBitOrder() == MSBFIRST) ? ret : reverseByte(ret);
+    ret = (_spis.getBitOrder() == MSBFIRST) ? ret : reverse16Bit(ret);
     DEBUGSPI("SPI: read back %02x\n", ret);
     return ret;
 }
@@ -135,30 +135,29 @@ void SPIClassRP2040::transfer(void *buf, size_t count) {
     uint8_t *buff = reinterpret_cast<uint8_t *>(buf);
     for (size_t i = 0; i < count; i++) {
         *buff = transfer(*buff);
-        *buff = (_spis.getBitOrder() == MSBFIRST) ? *buff : reverseByte(*buff);
         buff++;
     }
     DEBUGSPI("SPI::transfer completed\n");
 }
 
-void SPIClassRP2040::transfer(void *txbuf, void *rxbuf, size_t count) {
+void SPIClassRP2040::transfer(const void *txbuf, void *rxbuf, size_t count) {
     if (!_initted) {
         return;
     }
 
     DEBUGSPI("SPI::transfer(%p, %p, %d)\n", txbuf, rxbuf, count);
-    uint8_t *txbuff = reinterpret_cast<uint8_t *>(txbuf);
+    const uint8_t *txbuff = reinterpret_cast<const uint8_t *>(txbuf);
     uint8_t *rxbuff = reinterpret_cast<uint8_t *>(rxbuf);
 
     // MSB version is easy!
     if (_spis.getBitOrder() == MSBFIRST) {
         spi_set_format(_spi, 8, cpol(), cpha(), SPI_MSB_FIRST);
 
-        if (rxbuf == NULL) { // transmit only!
+        if (rxbuf == nullptr) { // transmit only!
             spi_write_blocking(_spi, txbuff, count);
             return;
         }
-        if (txbuf == NULL) { // receive only!
+        if (txbuf == nullptr) { // receive only!
             spi_read_blocking(_spi, 0xFF, rxbuff, count);
             return;
         }
@@ -178,7 +177,7 @@ void SPIClassRP2040::transfer(void *txbuf, void *rxbuf, size_t count) {
 }
 
 void SPIClassRP2040::beginTransaction(SPISettings settings) {
-    DEBUGSPI("SPI::beginTransaction(clk=%d, bo=%s\n", _spis.getClockFreq(), (_spis.getBitOrder() == MSBFIRST) ? "MSB" : "LSB");
+    DEBUGSPI("SPI::beginTransaction(clk=%lu, bo=%s\n", _spis.getClockFreq(), (_spis.getBitOrder() == MSBFIRST) ? "MSB" : "LSB");
     if (_initted && settings == _spis) {
         DEBUGSPI("SPI: Reusing existing initted SPI\n");
     } else {

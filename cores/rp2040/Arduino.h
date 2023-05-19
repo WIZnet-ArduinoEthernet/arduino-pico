@@ -28,7 +28,7 @@
 #include "api/ArduinoAPI.h"
 #include "api/itoa.h" // ARM toolchain doesn't provide itoa etc, provide them
 #include <pins_arduino.h>
-#include "hardware/gpio.h" // Required for the port*Register macros
+#include <hardware/gpio.h> // Required for the port*Register macros
 #include "debug_internal.h"
 #include <RP2040.h> // CMSIS
 
@@ -68,29 +68,47 @@ void noInterrupts();
 #define portOutputRegister(port)    ((volatile uint32_t*) sio_hw->gpio_out)
 #define portInputRegister(port)     ((volatile uint32_t*) sio_hw->gpio_in)
 #define portModeRegister(port)      ((volatile uint32_t*) sio_hw->gpio_oe)
+#define digitalWriteFast(pin, val)  (val ? sio_hw->gpio_set = (1 << pin) : sio_hw->gpio_clr = (1 << pin))
+#define digitalReadFast(pin)        ((1 << pin) & sio_hw->gpio_in)
+#define sei() interrupts()
+#define cli() noInterrupts()
 
 // ADC RP2040-specific calls
 void analogReadResolution(int bits);
-float analogReadTemp();  // Returns core temp in Centigrade
+#ifdef __cplusplus
+float analogReadTemp(float vref = 3.3);  // Returns core temp in Centigrade
+#endif
 
 // PWM RP2040-specific calls
 void analogWriteFreq(uint32_t freq);
 void analogWriteRange(uint32_t range);
 void analogWriteResolution(int res);
 
-// FreeRTOS potential calls
-extern bool __isFreeRTOS;
-
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+// FreeRTOS potential calls
+extern bool __isFreeRTOS;
 
 // Ancient AVR defines
 #define HAVE_HWSERIAL0
 #define HAVE_HWSERIAL1
 #define HAVE_HWSERIAL2
 
+// PSTR/etc.
+#ifndef FPSTR
+#define FPSTR (const char *)
+#endif
+
+#ifndef PGM_VOID_P
+#define PGM_VOID_P void *
+#endif
+
 #ifdef __cplusplus
+
+// emptyString is an ESP-ism, a constant string with ""
+extern const String emptyString;
 
 #ifdef USE_TINYUSB
 // Needed for declaring Serial

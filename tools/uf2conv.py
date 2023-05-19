@@ -225,6 +225,23 @@ def convert_from_hex_to_uf2(buf):
 def to_str(b):
     return b.decode("utf-8", "replace")
 
+def possibly_add(p, q):
+    if p not in q:
+        if os.path.isdir(p):
+            if os.access(p, os.W_OK):
+                q.append(p)
+
+def possibly_anydir(p, q):
+    if os.path.isdir(p):
+        if os.access(p, os.R_OK):
+            r = glob.glob(p + "/*")
+            for t in r:
+                possibly_add(t, q)
+
+def possibly_any(p, q, r):
+    possibly_anydir(p, q)
+    possibly_anydir(p + r, q)
+
 def get_drives():
     drives = []
     if sys.platform == "win32":
@@ -248,21 +265,9 @@ def get_drives():
             if len(words) >= 3 and words[1] == "2" and words[2] == "FAT":
                 drives.append(words[0])
     else:
-        rootpath = "/run/media"
-        if not os.path.isdir(rootpath):
-            rootpath = "/media"
-        if not os.path.isdir(rootpath):
-            rootpath = "/opt/media"
         if sys.platform == "darwin":
-            rootpath = "/Volumes"
+            possibly_anydir("/Volumes", drives)
         elif sys.platform == "linux":
-            tmp = rootpath + "/" + os.environ["USER"]
-            if os.path.isdir(tmp):
-                rootpath = tmp
-        for d in os.listdir(rootpath):
-            drives.append(os.path.join(rootpath, d))
-
-        if (len(drives) == 0) and (sys.platform == "linux"):
             globexpr = "/dev/disk/by-id/usb-RPI_RP2*-part1"
             rpidisk = glob.glob(globexpr)
             if len(rpidisk) > 0:
@@ -277,6 +282,19 @@ def get_drives():
                 except Exception as ex:
                     print("Exception executing udisksctl. Exception: {}".format(ex))
                     # If it fails, no problem since it was a heroic attempt
+            '''
+            Generate a list and scan those too.
+            First add the usual suspects.
+            Then Scan a returned list.
+            '''
+            u="/" + os.environ["USER"]
+            possibly_anydir("/mnt", drives)
+            possibly_any("/media", drives, u)
+            possibly_any("/opt/media", drives, u)
+            possibly_any("/run/media", drives, u)
+            possibly_any("/var/run/media", drives, u)
+            # Add from udisksctl info?
+            # Add from /proc/mounts?
 
     def has_info(d):
         try:
@@ -346,9 +364,17 @@ def main():
         if str(args.serial).startswith("/dev/tty") or str(args.serial).startswith("COM") or str(args.serial).startswith("/dev/cu"):
             try:
                 print("Resetting " + str(args.serial))
+                sys.stdout.flush()
                 try:
-                    ser = serial.Serial(args.serial, 1200)
+                    ser = serial.Serial()
+                    ser.port = args.serial
+                    ser.open()
+                    ser.baudrate = 9600
+                    ser.dtr = True
+                    time.sleep(0.1)
                     ser.dtr = False
+                    ser.baudrate = 1200
+                    ser.close()
                 except:
                     pass # Ignore error in the case it is already in upload mode
             except:
@@ -376,15 +402,18 @@ def main():
             outbuf = convert_to_uf2(inpbuf)
         print("Converting to %s, output size: %d, start address: 0x%x" %
               (ext, len(outbuf), appstartaddr))
+        sys.stdout.flush()
         if args.convert or ext != "uf2":
             drives = []
             if args.output == None:
                 args.output = "flash." + ext
         else:
+            print("Scanning for RP2040 devices")
+            sys.stdout.flush()
             now = time.time()
             drives = []
             while (time.time() - now < 10.0) and (len(drives) == 0):
-                time.sleep(0.5) # Avoid 100% CPU use while waiting for drive to appear
+                time.sleep(1.0) # Avoid 100% CPU use while waiting for drive to appear
                 drives = get_drives()
 
         if args.output:
@@ -394,7 +423,19 @@ def main():
                 error("No drive to deploy.")
         for d in drives:
             print("Flashing %s (%s)" % (d, board_id(d)))
+            sys.stdout.flush()
             write_file(d + "/NEW.UF2", outbuf)
+
+        # Wait until serial port (if defined) re-appears, or 2s timeout unless UF2 drive direct upload
+        try:
+            if args.serial != "UF2 Board":
+                timeout = time.time() + 2.0
+                while time.time() < timeout:
+                    if os.access(args.serial, os.W_OK):
+                        break
+                    time.sleep(0.2)
+        except:
+            pass
 
 
 if __name__ == "__main__":

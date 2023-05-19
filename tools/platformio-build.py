@@ -21,8 +21,17 @@ platform = env.PioPlatform()
 board = env.BoardConfig()
 upload_protocol = env.subst("$UPLOAD_PROTOCOL") or "picotool"
 #ram_size = board.get("upload.maximum_ram_size") # PlatformIO gives 264K here
-# override to correct 256K for RAM section in linkerscript
-ram_size = 256 * 1024 # not the 264K, which is 256K SRAM + 2*4K SCRATCH(X/Y). 
+# but the RAM size we need is without the SCRATCH memory.
+if upload_protocol == "pico-debug":
+    ram_size = 240 * 1024 # pico-debug needs 16K of the upper memory for itself with pico-debug-gimmecache.uf2
+    # this only works when the user disables the USB stack.
+    if "PIO_FRAMEWORK_ARDUINO_NO_USB" not in env.Flatten(env.get("CPPDEFINES", [])):
+        sys.stderr.write("Must define PIO_FRAMEWORK_ARDUINO_NO_USB when using pico-debug!\n")
+        env.Exit(-1)
+else:
+    ram_size = 256 * 1024 # not the 264K, which is 256K SRAM + 2*4K SCRATCH(X/Y).
+# Update available RAM size
+board.update("upload.maximum_ram_size", ram_size)
 
 FRAMEWORK_DIR = platform.get_package_dir("framework-arduinopico")
 assert os.path.isdir(FRAMEWORK_DIR)
@@ -80,10 +89,22 @@ env.Replace(
 )
 
 # pico support library depends on ipv6 enable/disable
-if "PIO_FRAMEWORK_ARDUINO_ENABLE_IPV6" in flatten_cppdefines:
-    libpico = File(os.path.join(FRAMEWORK_DIR, "lib", "libpico-ipv6.a"))
+libpico = File(os.path.join(FRAMEWORK_DIR, "lib", "libpico.a"))
+if "PIO_FRAMEWORK_ARDUINO_ENABLE_BLUETOOTH" in flatten_cppdefines:
+    if "PIO_FRAMEWORK_ARDUINO_ENABLE_IPV6" in flatten_cppdefines:
+        libpicow = File(os.path.join(FRAMEWORK_DIR, "lib", "libpicow-ipv6-btc-ble.a"))
+    else:
+        libpicow = File(os.path.join(FRAMEWORK_DIR, "lib", "libpicow-noipv6-btc-ble.a"))
+    env.Append(
+        CPPDEFINES=[
+            ("ENABLE_CLASSIC", 1),
+            ("ENABLE_BLE", 1)
+        ]
+    )
+elif "PIO_FRAMEWORK_ARDUINO_ENABLE_IPV6" in flatten_cppdefines:
+    libpicow = File(os.path.join(FRAMEWORK_DIR, "lib", "libpicow-ipv6-nobtc-noble.a"))
 else:
-    libpico = File(os.path.join(FRAMEWORK_DIR, "lib", "libpico.a"))
+    libpicow = File(os.path.join(FRAMEWORK_DIR, "lib", "libpicow-noipv6-nobtc-noble.a"))
 
 env.Append(
     ASFLAGS=env.get("CCFLAGS", [])[:],
@@ -96,7 +117,7 @@ env.Append(
         "-mthumb",
         "-ffunction-sections",
         "-fdata-sections"
-        # -iprefix etc. added lader if in build mode
+        # -iprefix etc. added later if in build mode
     ],
 
     CFLAGS=[
@@ -114,6 +135,10 @@ env.Append(
         ("BOARD_NAME", '\\"%s\\"' % env.subst("$BOARD")),
         "ARM_MATH_CM0_FAMILY",
         "ARM_MATH_CM0_PLUS",
+        "TARGET_RP2040",
+        # at this point, the main.py builder script hasn't updated upload.maximum_size yet,
+        # so it's the original value for the full flash.
+        ("PICO_FLASH_SIZE_BYTES", board.get("upload.maximum_size"))
     ],
 
     CPPPATH=[
@@ -150,6 +175,7 @@ env.Append(
     LIBS=[
         File(os.path.join(FRAMEWORK_DIR, "lib", "ota.o")),
         libpico,
+        libpicow,
         File(os.path.join(FRAMEWORK_DIR, "lib", "libbearssl.a")),
         "m", "c", stdcpp_lib, "c"]
 )
@@ -165,7 +191,6 @@ else:
 
 
 def configure_usb_flags(cpp_defines):
-    global ram_size
     if "USE_TINYUSB" in cpp_defines:
         env.Append(CPPPATH=[os.path.join(
             FRAMEWORK_DIR, "libraries", "Adafruit_TinyUSB_Arduino", "src", "arduino")])
@@ -204,10 +229,9 @@ def configure_usb_flags(cpp_defines):
     pidtouse = usb_pid
     if upload_protocol == "picoprobe": 
         pidtouse = '0x0004'
-    elif upload_protocol == "picodebug":
+    elif upload_protocol == "pico-debug":
         vidtouse = '0x1209'
         pidtouse = '0x2488'
-        ram_size = 240 * 1024
 
     env.Append(CPPDEFINES=[
         ("CFG_TUSB_MCU", "OPT_MCU_RP2040"),
@@ -228,12 +252,11 @@ def configure_usb_flags(cpp_defines):
     hw_ids[0][0] = vidtouse
     hw_ids[0][1] = pidtouse
     board.update("build.hwids", hw_ids)
-    board.update("upload.maximum_ram_size", ram_size)
 
 def configure_network_flags(cpp_defines):
     env.Append(CPPDEFINES=[
         ("PICO_CYW43_ARCH_THREADSAFE_BACKGROUND", 1),
-        ("CYW43_LWIP", 0),
+        ("CYW43_LWIP", 1),
         ("LWIP_IPV4", 1),
         ("LWIP_IGMP", 1),
         ("LWIP_CHECKSUM_CTRL_PER_NETIF", 1)

@@ -3,6 +3,7 @@
 // Pin definitions taken from:
 //    https://datasheets.raspberrypi.org/pico/pico-datasheet.pdf
 
+extern bool  __isPicoW;
 
 // LEDs
 #define PIN_LED        (32u)

@@ -1,7 +1,7 @@
 WiFi (Raspberry Pi Pico W) Support
 ==================================
 
-WiFi is supported on the Raspberry Pi Pico W by selecting the "Raspbery Pi Pico W" board in the Boards Manager.  It is generally compatible with the `Arduino WiFi library <https://www.arduino.cc/en/Reference/WiFi>`__ and the `ESP8266 Arduino WiFi library <https://github.com/esp8266/Arduino>`__.
+WiFi is supported on the Raspberry Pi Pico W by selecting the "Raspberry Pi Pico W" board in the Boards Manager.  It is generally compatible with the `Arduino WiFi library <https://www.arduino.cc/en/Reference/WiFi>`__ and the `ESP8266 Arduino WiFi library <https://github.com/esp8266/Arduino>`__.
 
 Enable WiFi support by selecting the `Raspberry Pi Pico W` board in the IDE and adding ``#include <WiFi.h>`` in your sketch.
 
@@ -39,8 +39,6 @@ Please note that WiFi on the Pico W is a work-in-progress and there are some imp
   * Extensible Authentication Protocol (EAP) is not supported
 
   * Combined STA/AP mode is not supported
-
-  * Certain WiFi status values (RSSI, BSSID, etc.) are not available.
 
 * Multicore is supported, but only one core may run ``WiFi`` code.
 

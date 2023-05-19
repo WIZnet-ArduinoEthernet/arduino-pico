@@ -22,24 +22,30 @@
 #include <CoreMutex.h>
 #include <hardware/gpio.h>
 #include <hardware/sync.h>
-#include <stack>
 #include <map>
 
 // Support nested IRQ disable/re-enable
-static std::stack<uint32_t> _irqStack[2];
+#define maxIRQs 15
+static uint32_t _irqStackTop[2] = { 0, 0 };
+static uint32_t _irqStack[2][maxIRQs];
 
 extern "C" void interrupts() {
-    if (_irqStack[get_core_num()].empty()) {
+    auto core = get_core_num();
+    if (!_irqStackTop[core]) {
         // ERROR
         return;
     }
-    auto oldIrqs = _irqStack[get_core_num()].top();
-    _irqStack[get_core_num()].pop();
-    restore_interrupts(oldIrqs);
+    restore_interrupts(_irqStack[core][--_irqStackTop[core]]);
 }
 
 extern "C" void noInterrupts() {
-    _irqStack[get_core_num()].push(save_and_disable_interrupts());
+    auto core = get_core_num();
+    if (_irqStackTop[core] == maxIRQs) {
+        // ERROR
+        panic("IRQ stack overflow");
+    }
+
+    _irqStack[core][_irqStackTop[core]++] = save_and_disable_interrupts();
 }
 
 // Only 1 GPIO IRQ callback for all pins, so we need to look at the pin it's for and
@@ -71,13 +77,22 @@ static std::map<pin_size_t, CBInfo> _map;
 void _gpioInterruptDispatcher(uint gpio, uint32_t events) {
     (void) events;
     // Only need to lock around the std::map check, not the whole IRQ callback
-    CoreMutex m(&_irqMutex);
+    CoreMutex m(&_irqMutex, (FromISR | DebugEnable));
     if (m) {
         auto irq = _map.find(gpio);
         if (irq != _map.end()) {
             auto cb = irq->second;
             cb.callback();
         }
+    }
+}
+
+// To be called when appropriately protected w/IRQ and mutex protects
+static void _detachInterruptInternal(pin_size_t pin) {
+    auto irq = _map.find(pin);
+    if (irq != _map.end()) {
+        gpio_set_irq_enabled(pin, 0x0f /* all */, false);
+        _map.erase(pin);
     }
 }
 
@@ -97,7 +112,7 @@ extern "C" void attachInterrupt(pin_size_t pin, voidFuncPtr callback, PinStatus 
     default:      return;  // ERROR
     }
     noInterrupts();
-    detachInterrupt(pin);
+    _detachInterruptInternal(pin);
     CBInfo cb(callback);
     _map.insert({pin, cb});
     gpio_set_irq_enabled_with_callback(pin, events, true, _gpioInterruptDispatcher);
@@ -120,7 +135,7 @@ void attachInterruptParam(pin_size_t pin, voidFuncPtrParam callback, PinStatus m
     default:      return;  // ERROR
     }
     noInterrupts();
-    detachInterrupt(pin);
+    _detachInterruptInternal(pin);
     CBInfo cb(callback, param);
     _map.insert({pin, cb});
     gpio_set_irq_enabled_with_callback(pin, events, true, _gpioInterruptDispatcher);
@@ -134,10 +149,6 @@ extern "C" void detachInterrupt(pin_size_t pin) {
     }
 
     noInterrupts();
-    auto irq = _map.find(pin);
-    if (irq != _map.end()) {
-        gpio_set_irq_enabled(pin, 0x0f /* all */, false);
-        _map.erase(pin);
-    }
+    _detachInterruptInternal(pin);
     interrupts();
 }

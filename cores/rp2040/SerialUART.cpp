@@ -69,7 +69,7 @@ bool SerialUART::setRTS(pin_size_t pin) {
     constexpr uint32_t valid[2] = { __bitset({3, 15, 19}) /* UART0 */,
                                     __bitset({7, 11, 23, 27})  /* UART1 */
                                   };
-    if ((!_running) && ((1 << pin) & valid[uart_get_index(_uart)])) {
+    if ((!_running) && ((pin == UART_PIN_NOT_DEFINED) || ((1 << pin) & valid[uart_get_index(_uart)]))) {
         _rts = pin;
         return true;
     }
@@ -86,7 +86,7 @@ bool SerialUART::setCTS(pin_size_t pin) {
     constexpr uint32_t valid[2] = { __bitset({2, 14, 18}) /* UART0 */,
                                     __bitset({6, 10, 22, 26})  /* UART1 */
                                   };
-    if ((!_running) && ((1 << pin) & valid[uart_get_index(_uart)])) {
+    if ((!_running) && ((pin == UART_PIN_NOT_DEFINED) || ((1 << pin) & valid[uart_get_index(_uart)]))) {
         _cts = pin;
         return true;
     }
@@ -134,6 +134,20 @@ void SerialUART::begin(unsigned long baud, uint16_t config) {
     _overflow = false;
     _queue = new uint8_t[_fifoSize];
     _baud = baud;
+
+    _fcnTx = gpio_get_function(_tx);
+    _fcnRx = gpio_get_function(_rx);
+    gpio_set_function(_tx, GPIO_FUNC_UART);
+    gpio_set_function(_rx, GPIO_FUNC_UART);
+    if (_rts != UART_PIN_NOT_DEFINED) {
+        _fcnRts = gpio_get_function(_rts);
+        gpio_set_function(_rts, GPIO_FUNC_UART);
+    }
+    if (_cts != UART_PIN_NOT_DEFINED) {
+        _fcnCts = gpio_get_function(_cts);
+        gpio_set_function(_cts, GPIO_FUNC_UART);
+    }
+
     uart_init(_uart, baud);
     int bits, stop;
     uart_parity_t parity;
@@ -171,14 +185,6 @@ void SerialUART::begin(unsigned long baud, uint16_t config) {
         break;
     }
     uart_set_format(_uart, bits, stop, parity);
-    gpio_set_function(_tx, GPIO_FUNC_UART);
-    gpio_set_function(_rx, GPIO_FUNC_UART);
-    if (_rts != UART_PIN_NOT_DEFINED) {
-        gpio_set_function(_rts, GPIO_FUNC_UART);
-    }
-    if (_cts != UART_PIN_NOT_DEFINED) {
-        gpio_set_function(_cts, GPIO_FUNC_UART);
-    }
     uart_set_hw_flow(_uart, _rts != UART_PIN_NOT_DEFINED, _cts != UART_PIN_NOT_DEFINED);
     _writer = 0;
     _reader = 0;
@@ -196,6 +202,7 @@ void SerialUART::begin(unsigned long baud, uint16_t config) {
     } else {
         // Polling mode has no IRQs used
     }
+    _break = false;
     _running = true;
 }
 
@@ -211,6 +218,7 @@ void SerialUART::end() {
             irq_set_enabled(UART1_IRQ, false);
         }
     }
+
     // Paranoia - ensure nobody else is using anything here at the same time
     mutex_enter_blocking(&_mutex);
     mutex_enter_blocking(&_fifoMutex);
@@ -219,6 +227,16 @@ void SerialUART::end() {
     // Reset the mutexes once all is off/cleaned up
     mutex_exit(&_fifoMutex);
     mutex_exit(&_mutex);
+
+    // Restore pin functions
+    gpio_set_function(_tx, _fcnTx);
+    gpio_set_function(_rx, _fcnRx);
+    if (_rts != UART_PIN_NOT_DEFINED) {
+        gpio_set_function(_rts, _fcnRts);
+    }
+    if (_cts != UART_PIN_NOT_DEFINED) {
+        gpio_set_function(_cts, _fcnCts);
+    }
 }
 
 void SerialUART::_pumpFIFO() {
@@ -273,13 +291,22 @@ int SerialUART::read() {
 }
 
 bool SerialUART::overflow() {
-    CoreMutex m(&_mutex);
-    if (!_running || !m) {
+    if (!_running) {
         return false;
     }
-    bool hold = _overflow;
+
+    if (_polling) {
+        _handleIRQ(false);
+    } else {
+        _pumpFIFO();
+    }
+
+    mutex_enter_blocking(&_fifoMutex);
+    bool ovf = _overflow;
     _overflow = false;
-    return hold;
+    mutex_exit(&_fifoMutex);
+
+    return ovf;
 }
 
 int SerialUART::available() {
@@ -350,6 +377,25 @@ SerialUART::operator bool() {
     return _running;
 }
 
+bool SerialUART::getBreakReceived() {
+    if (!_running) {
+        return false;
+    }
+
+    if (_polling) {
+        _handleIRQ(false);
+    } else {
+        _pumpFIFO();
+    }
+
+    mutex_enter_blocking(&_fifoMutex);
+    bool break_received = _break;
+    _break = false;
+    mutex_exit(&_fifoMutex);
+
+    return break_received;
+}
+
 void arduino::serialEvent1Run(void) {
     if (serialEvent1 && Serial1.available()) {
         serialEvent1();
@@ -375,7 +421,16 @@ void __not_in_flash_func(SerialUART::_handleIRQ)(bool inIRQ) {
     // ICR is write-to-clear
     uart_get_hw(_uart)->icr = UART_UARTICR_RTIC_BITS | UART_UARTICR_RXIC_BITS;
     while (uart_is_readable(_uart)) {
-        auto val = uart_getc(_uart);
+        uint32_t raw = uart_get_hw(_uart)->dr;
+        if (raw & 0x400) {
+            // break!
+            _break = true;
+            continue;
+        } else if (raw & 0x300) {
+            // Framing, Parity Error.  Ignore this bad char
+            continue;
+        }
+        uint8_t val = raw & 0xff;
         auto next_writer = _writer + 1;
         if (next_writer == _fifoSize) {
             next_writer = 0;

@@ -21,9 +21,9 @@ static const uint8_t D13 = (6u);
 static const uint8_t D14 = (26u);
 static const uint8_t D15 = (27u);
 static const uint8_t D16 = (28u);
-static const uint8_t D17 = (29u); 
-static const uint8_t D18 = (12u); 
-static const uint8_t D19 = (13u); 
+static const uint8_t D17 = (29u);
+static const uint8_t D18 = (12u);
+static const uint8_t D19 = (13u);
 static const uint8_t D20 = (2u);
 static const uint8_t D21 = (24u);
 static const uint8_t D22 = (22u);
@@ -93,6 +93,9 @@ static const uint8_t SCK = PIN_SPI0_SCK;
 #define NINA_RESETN		(D24)
 #define SerialNina		Serial3
 #define SerialHCI		Serial2
+
+#define SERIAL3_TX              (D25)
+#define SERIAL3_RX              (D26)
 
 //#define NINA_GPIOIRQ	(21u) // LEDG pin (GPIO26 on NINA)
 #define NINA_GPIO0		(D20)   // (2u), real GPIO0 on NINA

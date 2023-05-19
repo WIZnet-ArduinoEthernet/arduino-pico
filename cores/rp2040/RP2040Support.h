@@ -27,24 +27,15 @@
 #include <hardware/structs/rosc.h>
 #include <hardware/structs/systick.h>
 #include <pico/multicore.h>
+#include <pico/rand.h>
 #include <pico/util/queue.h>
 #include "CoreMutex.h"
 #include "ccount.pio.h"
 #include <malloc.h>
 
+#include "_freertos.h"
+
 extern "C" volatile bool __otherCoreIdled;
-
-// Halt the FreeRTOS PendSV task switching magic
-extern "C" int __holdUpPendSV;
-
-// FreeRTOS weak functions, to be overridden when we really are running FreeRTOS
-extern "C" {
-    extern void vTaskSuspendAll() __attribute__((weak));
-    extern int32_t xTaskResumeAll() __attribute__((weak));
-    typedef struct tskTaskControlBlock * TaskHandle_t;
-    extern void vTaskPreemptionDisable(TaskHandle_t p) __attribute__((weak));
-    extern void vTaskPreemptionEnable(TaskHandle_t p) __attribute__((weak));
-}
 
 class _MFIFO {
 public:
@@ -100,15 +91,14 @@ public:
         if (!_multicore) {
             return;
         }
-        __holdUpPendSV = 1;
         if (__isFreeRTOS) {
-            vTaskPreemptionDisable(nullptr);
-            vTaskSuspendAll();
+            __freertos_idle_other_core();
+        } else {
+            mutex_enter_blocking(&_idleMutex);
+            __otherCoreIdled = false;
+            multicore_fifo_push_blocking(_GOTOSLEEP);
+            while (!__otherCoreIdled) { /* noop */ }
         }
-        mutex_enter_blocking(&_idleMutex);
-        __otherCoreIdled = false;
-        multicore_fifo_push_blocking(_GOTOSLEEP);
-        while (!__otherCoreIdled) { /* noop */ }
     }
 
     void resumeOtherCore() {
@@ -118,10 +108,8 @@ public:
         mutex_exit(&_idleMutex);
         __otherCoreIdled = false;
         if (__isFreeRTOS) {
-            xTaskResumeAll();
-            vTaskPreemptionEnable(nullptr);
+            __freertos_resume_other_core();
         }
-        __holdUpPendSV = 0;
 
         // Other core will exit busy-loop and return to operation
         // once __otherCoreIdled == false.
@@ -248,12 +236,17 @@ public:
     // Convert from microseconds to PIO clock cycles
     static int usToPIOCycles(int us) {
         // Parenthesis needed to guarantee order of operations to avoid 32bit overflow
-        return (us * (clock_get_hz(clk_sys) / 1000000));
+        return (us * (clock_get_hz(clk_sys) / 1'000'000));
     }
 
     // Get current clock frequency
     static int f_cpu() {
         return clock_get_hz(clk_sys);
+    }
+
+    // Get current CPU core number
+    static int cpuid() {
+        return sio_hw->cpuid;
     }
 
     // Get CPU cycle count.  Needs to do magic to extens 24b HW to something longer
@@ -314,15 +307,28 @@ public:
     }
 
     void reboot() {
-        watchdog_reboot(0, 0, 100);
+        watchdog_reboot(0, 0, 10);
+        while (1) {
+            continue;
+        }
     }
 
     inline void restart() {
         reboot();
     }
 
+    static void enableDoubleResetBootloader();
+
+    void wdt_begin(uint32_t delay_ms) {
+        watchdog_enable(delay_ms, 1);
+    }
+
+    void wdt_reset() {
+        watchdog_update();
+    }
+
     const char *getChipID() {
-        static char id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1] = { 0 };
+        static char id[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1] = { 0 };
         if (!id[0]) {
             pico_get_unique_board_id_string(id, sizeof(id));
         }
@@ -333,27 +339,19 @@ public:
     _MFIFO fifo;
 
 
-    // TODO - Not so great HW random generator.  32-bits wide.  Cryptographers somewhere are crying
     uint32_t hwrand32() {
-        // Try and whiten the HW ROSC bit
-        uint32_t r = 0;
-        for (int k = 0; k < 32; k++) {
-            unsigned long int b;
-            do {
-                b = rosc_hw->randombit & 1;
-                if (b != (rosc_hw->randombit & 1)) {
-                    break;
-                }
-            } while (true);
-            r <<= 1;
-            r |= b;
-        }
-        // Stir using the cycle count LSBs.  In any WiFi use case this will be a random # since the connection time is not cycle-accurate
-        uint64_t rr = (((uint64_t)~r) << 32LL) | r;
-        rr >>= rp2040.getCycleCount() & 32LL;
-
-        return (uint32_t)rr;
+        return get_rand_32();
     }
+
+    bool isPicoW() {
+#if !defined(ARDUINO_RASPBERRY_PI_PICO_W)
+        return false;
+#else
+        extern bool __isPicoW;
+        return __isPicoW;
+#endif
+    }
+
 
 private:
     static void _SystickHandler() {
