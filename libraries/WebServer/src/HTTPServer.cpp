@@ -43,6 +43,7 @@ static const char Content_Length[] = "Content-Length";
 
 HTTPServer::HTTPServer()
     : _corsEnabled(false)
+    , _currentClient(nullptr)
     , _currentMethod(HTTP_ANY)
     , _currentVersion(0)
     , _currentStatus(HC_NONE)
@@ -87,10 +88,7 @@ static String md5str(String &in) {
     char out[33] = {0};
     MD5Builder _ctx;
     uint8_t i;
-    uint8_t * _buf = (uint8_t*)malloc(16);
-    if (_buf == NULL) {
-        return String(out);
-    }
+    uint8_t _buf[16];
     memset(_buf, 0x00, 16);
     _ctx.begin();
     _ctx.add((const uint8_t *)in.c_str(), in.length());
@@ -100,7 +98,6 @@ static String md5str(String &in) {
         sprintf(out + (i * 2), "%02x", _buf[i]);
     }
     out[32] = 0;
-    free(_buf);
     return String(out);
 }
 
@@ -113,18 +110,15 @@ bool HTTPServer::authenticate(const char * username, const char * password) {
             char toencodeLen = strlen(username) + strlen(password) + 1;
             char *toencode = new char[toencodeLen + 1];
             if (toencode == NULL) {
-                authReq = "";
                 return false;
             }
             char *encoded = new char[base64_encode_expected_len(toencodeLen) + 1];
             if (encoded == NULL) {
-                authReq = "";
                 delete[] toencode;
                 return false;
             }
             sprintf(toencode, "%s:%s", username, password);
             if (base64_encode_chars(toencode, toencodeLen, encoded) > 0 && authReq == encoded) {
-                authReq = "";
                 delete[] toencode;
                 delete[] encoded;
                 return true;
@@ -136,7 +130,6 @@ bool HTTPServer::authenticate(const char * username, const char * password) {
             log_v("%s", authReq.c_str());
             String _username = _extractParam(authReq, F("username=\""), '\"');
             if (!_username.length() || _username != String(username)) {
-                authReq = "";
                 return false;
             }
             // extracting required parameters for RFC 2069 simpler Digest
@@ -147,11 +140,9 @@ bool HTTPServer::authenticate(const char * username, const char * password) {
             String _opaque   = _extractParam(authReq, F("opaque=\""), '\"');
 
             if ((!_realm.length()) || (!_nonce.length()) || (!_uri.length()) || (!_response.length()) || (!_opaque.length())) {
-                authReq = "";
                 return false;
             }
             if ((_opaque != _sopaque) || (_nonce != _snonce) || (_realm != _srealm)) {
-                authReq = "";
                 return false;
             }
             // parameters for the RFC 2617 newer Digest
@@ -183,11 +174,9 @@ bool HTTPServer::authenticate(const char * username, const char * password) {
             }
             log_v("The Proper response=%s", _responsecheck.c_str());
             if (_response == _responsecheck) {
-                authReq = "";
                 return true;
             }
         }
-        authReq = "";
     }
     return false;
 }
@@ -396,11 +385,7 @@ void HTTPServer::send(int code, const String& content_type, const String& conten
 }
 
 void HTTPServer::send(int code, const char* content_type, const char* content) {
-    const String passStr = (String)content;
-    if (strlen(content) != passStr.length()) {
-        log_e("String cast failed.  Use send_P for long arrays");
-    }
-    send(code, content_type, passStr);
+    send(code, content_type, content, content ? strlen(content) : 0);
 }
 
 void HTTPServer::send(int code, const char* content_type, const char* content, size_t contentLength) {
@@ -420,18 +405,14 @@ void HTTPServer::send_P(int code, PGM_P content_type, PGM_P content) {
     }
 
     String header;
-    char type[64];
-    memccpy_P((void*)type, (PGM_VOID_P)content_type, 0, sizeof(type));
-    _prepareHeader(header, code, (const char*)type, contentLength);
+    _prepareHeader(header, code, content_type, contentLength);
     _currentClientWrite(header.c_str(), header.length());
     sendContent_P(content);
 }
 
 void HTTPServer::send_P(int code, PGM_P content_type, PGM_P content, size_t contentLength) {
     String header;
-    char type[64];
-    memccpy_P((void*)type, (PGM_VOID_P)content_type, 0, sizeof(type));
-    _prepareHeader(header, code, (const char*)type, contentLength);
+    _prepareHeader(header, code, content_type, contentLength);
     sendContent(header);
     sendContent_P(content, contentLength);
 }
@@ -443,12 +424,9 @@ void HTTPServer::sendContent(const String& content) {
 void HTTPServer::sendContent(const char* content, size_t contentLength) {
     const char * footer = "\r\n";
     if (_chunked) {
-        char * chunkSize = (char *)malloc(11);
-        if (chunkSize) {
-            sprintf(chunkSize, "%x%s", contentLength, footer);
-            _currentClientWrite(chunkSize, strlen(chunkSize));
-            free(chunkSize);
-        }
+        char chunkSize[11];
+        sprintf(chunkSize, "%x%s", (unsigned int)contentLength, footer);
+        _currentClientWrite(chunkSize, strlen(chunkSize));
     }
     _currentClientWrite(content, contentLength);
     if (_chunked) {
@@ -466,12 +444,9 @@ void HTTPServer::sendContent_P(PGM_P content) {
 void HTTPServer::sendContent_P(PGM_P content, size_t size) {
     const char * footer = "\r\n";
     if (_chunked) {
-        char * chunkSize = (char *)malloc(11);
-        if (chunkSize) {
-            sprintf(chunkSize, "%x%s", size, footer);
-            _currentClientWrite(chunkSize, strlen(chunkSize));
-            free(chunkSize);
-        }
+        char chunkSize[11];
+        sprintf(chunkSize, "%x%s", (unsigned int)size, footer);
+        _currentClientWrite(chunkSize, strlen(chunkSize));
     }
     _currentClientWrite_P(content, size);
     if (_chunked) {
