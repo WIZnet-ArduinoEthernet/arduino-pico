@@ -1,6 +1,7 @@
 /*
-    WiFiMulti.h - Choose best RSSI and connect
-    Copyright (c) 2022 Earle F. Philhower, III
+    Board init for the Challenger RP2040 NFC
+
+    Copyright (c) 2022 P. Oldberg <pontus@ilabs.se>
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -15,29 +16,19 @@
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-
-    Modified by Ivan Grokhotkov, January 2015 - esp8266 support
 */
+#include <Arduino.h>
 
-#pragma once
+/**
+ * Setup control pins for the NFC chip.
+ */
+void initVariant() {
+  // Initialize the interrupt pin to be an input.
+  // Setting it to an interrupt and connecting a call back is up to the app.
+  pinMode(PIN_PN7150_IRQ_B, INPUT);
 
-#include <list>
-#include <stdint.h>
-#include "wl_definitions.h"
-
-class WiFiMulti {
-public:
-    WiFiMulti();
-    ~WiFiMulti();
-
-    bool addAP(const char *ssid, const char *pass = nullptr);
-
-    uint8_t run(uint32_t to = 10000);
-
-private:
-    struct _AP {
-        char *ssid;
-        char *pass;
-    };
-    std::list<struct _AP> _list;
-};
+  // Initialize the reset pin to an output and hold the device in reset.
+  // It is up to the application to release it.
+  pinMode(PIN_PN7150_RST_B, OUTPUT);
+  digitalWrite(PIN_PN7150_RST_B, LOW);
+}

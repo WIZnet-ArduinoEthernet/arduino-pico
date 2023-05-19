@@ -238,7 +238,7 @@ public:
     // Convert from microseconds to PIO clock cycles
     static int usToPIOCycles(int us) {
         // Parenthesis needed to guarantee order of operations to avoid 32bit overflow
-        return (us * (clock_get_hz(clk_sys) / 1000000));
+        return (us * (clock_get_hz(clk_sys) / 1'000'000));
     }
 
     // Get current clock frequency
@@ -312,6 +312,14 @@ public:
 
     inline void restart() {
         reboot();
+    }
+
+    void wdt_begin(uint32_t delay_ms) {
+        watchdog_enable(delay_ms, 1);
+    }
+
+    void wdt_reset() {
+        watchdog_update();
     }
 
     const char *getChipID() {
