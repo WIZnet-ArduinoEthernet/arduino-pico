@@ -41,3 +41,6 @@
 [submodule "libraries/WizFi360_arduino_library"]
 	path = libraries/WizFi360_arduino_library
 	url = https://github.com/Wiznet/WizFi360_arduino_library.git
+[submodule "libraries/http_parser/lib/http-parser"]
+	path = libraries/http-parser/lib/http-parser
+	url = https://github.com/nodejs/http-parser.git
