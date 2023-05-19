@@ -25,24 +25,74 @@
 */
 #include <stdlib.h>
 
+/* FreeRTOS includes. */
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+#include "semphr.h"
+
 /* Arduino Core includes */
 #include <Arduino.h>
 #include <RP2040USB.h>
 #include "tusb.h"
 
-
 /* Raspberry PI Pico includes */
 #include <pico.h>
 #include <pico/time.h>
 
-/* FreeRTOS includes. */
-#include "FreeRTOS.h"
-#include "task.h"
-#include "timers.h"
+#include <_freertos.h>
+
+// Interfaces for the main core to use FreeRTOS mutexes
+extern "C" {
+    extern volatile bool __otherCoreIdled;
+
+    SemaphoreHandle_t __freertos_mutex_create() {
+        return xSemaphoreCreateMutex();
+    }
+
+    SemaphoreHandle_t _freertos_recursive_mutex_create() {
+        return xSemaphoreCreateRecursiveMutex();
+    }
+
+    void __freertos_mutex_take(SemaphoreHandle_t mtx) {
+        xSemaphoreTake(mtx, portMAX_DELAY);
+    }
+
+    void __freertos_mutex_take_from_isr(SemaphoreHandle_t mtx) {
+        xSemaphoreTakeFromISR(mtx, NULL);
+    }
+
+    int __freertos_mutex_try_take(SemaphoreHandle_t mtx) {
+        return xSemaphoreTake(mtx, 0);
+    }
+
+    void __freertos_mutex_give(SemaphoreHandle_t mtx) {
+        xSemaphoreGive(mtx);
+    }
+
+    void __freertos_mutex_give_from_isr(SemaphoreHandle_t mtx) {
+        xSemaphoreGiveFromISR(mtx, NULL);
+    }
+
+    void __freertos_recursive_mutex_take(SemaphoreHandle_t mtx) {
+        xSemaphoreTakeRecursive(mtx, portMAX_DELAY);
+    }
+
+    int __freertos_recursive_mutex_try_take(SemaphoreHandle_t mtx) {
+        return xSemaphoreTakeRecursive(mtx, 0);
+    }
+
+    void __freertos_recursive_mutex_give(SemaphoreHandle_t mtx) {
+        xSemaphoreGiveRecursive(mtx);
+    }
+}
+
 
 /*-----------------------------------------------------------*/
 
+extern void __initFreeRTOSMutexes();
 void initFreeRTOS(void) {
+    __initFreeRTOSMutexes();
 }
 
 extern void setup() __attribute__((weak));
@@ -55,7 +105,7 @@ volatile bool __usbInitted = false;
 
 static void __core0(void *params) {
     (void) params;
-#ifndef NO_USB
+#if !defined(NO_USB) && !defined(USE_TINYUSB)
     while (!__usbInitted) {
         delay(1);
     }
@@ -77,7 +127,7 @@ static void __core0(void *params) {
 
 static void __core1(void *params) {
     (void) params;
-#ifndef NO_USB
+#if !defined(NO_USB) && !defined(USE_TINYUSB)
     while (!__usbInitted) {
         delay(1);
     }
@@ -104,10 +154,44 @@ extern "C" void yield() {
     taskYIELD();
 }
 
+static TaskHandle_t __idleCoreTask[2];
+static void __no_inline_not_in_flash_func(IdleThisCore)(void *param) {
+    (void) param;
+    while (true) {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        vTaskPreemptionDisable(nullptr);
+        portDISABLE_INTERRUPTS();
+        __otherCoreIdled = true;
+        while (__otherCoreIdled) {
+            /* noop */
+        }
+        portENABLE_INTERRUPTS();
+        vTaskPreemptionEnable(nullptr);
+    }
+}
+
+extern "C" void __no_inline_not_in_flash_func(__freertos_idle_other_core)() {
+    vTaskPreemptionDisable(nullptr);
+    xTaskNotifyGive(__idleCoreTask[ 1 ^ sio_hw->cpuid ]);
+    while (!__otherCoreIdled) {
+        /* noop */
+    }
+    portDISABLE_INTERRUPTS();
+    vTaskSuspendAll();
+}
+
+extern "C" void __no_inline_not_in_flash_func(__freertos_resume_other_core)() {
+    __otherCoreIdled = false;
+    portENABLE_INTERRUPTS();
+    xTaskResumeAll();
+    vTaskPreemptionEnable(nullptr);
+}
+
+
 extern mutex_t __usb_mutex;
 static TaskHandle_t __usbTask;
 static void __usb(void *param);
-
+extern volatile bool __freeRTOSinitted;
 void startFreeRTOS(void) {
 
     TaskHandle_t c0;
@@ -120,7 +204,14 @@ void startFreeRTOS(void) {
         vTaskCoreAffinitySet(c1, 1 << 1);
     }
 
+    // Create the idle-other-core tasks (for when flash is being written)
+    xTaskCreate(IdleThisCore, "IdleCore0", 128, 0, configMAX_PRIORITIES - 1, __idleCoreTask + 0);
+    vTaskCoreAffinitySet(__idleCoreTask[0], 1 << 0);
+    xTaskCreate(IdleThisCore, "IdleCore1", 128, 0, configMAX_PRIORITIES - 1, __idleCoreTask + 1);
+    vTaskCoreAffinitySet(__idleCoreTask[1], 1 << 1);
+
     // Initialise and run the freeRTOS scheduler. Execution should never return here.
+    __freeRTOSinitted = true;
     vTaskStartScheduler();
 
     while (true) {
@@ -211,16 +302,20 @@ void vApplicationTickHook(void) {
     Private function to enable board led to use it in application hooks
 */
 void prvSetMainLedOn(void) {
+#ifdef LED_BUILTIN
     gpio_init(LED_BUILTIN);
     gpio_set_dir(LED_BUILTIN, true);
     gpio_put(LED_BUILTIN, true);
+#endif
 }
 
 /**
     Private function to blink board led to use it in application hooks
 */
 void prvBlinkMainLed(void) {
+#ifdef LED_BUILTIN
     gpio_put(LED_BUILTIN, !gpio_get(LED_BUILTIN));
+#endif
 }
 
 #endif
@@ -371,9 +466,10 @@ static void __usb(void *param) {
     __usbInitted = true;
 
     while (true) {
-        if (mutex_try_enter(&__usb_mutex, NULL)) {
+        auto m = __get_freertos_mutex_for_ptr(&__usb_mutex);
+        if (xSemaphoreTake(m, 0)) {
             tud_task();
-            mutex_exit(&__usb_mutex);
+            xSemaphoreGive(m);
         }
         vTaskDelay(1 / portTICK_PERIOD_MS);
     }
@@ -388,7 +484,9 @@ void __USBStart() {
     __SetupDescHIDReport();
     __SetupUSBDescriptor();
 
-    // Make highest prio and locked to core 0
-    xTaskCreate(__usb, "USB", 256, 0, configMAX_PRIORITIES - 1, &__usbTask);
+    // Make high prio and locked to core 0
+    xTaskCreate(__usb, "USB", 256, 0, configMAX_PRIORITIES - 2, &__usbTask);
     vTaskCoreAffinitySet(__usbTask, 1 << 0);
 }
+
+

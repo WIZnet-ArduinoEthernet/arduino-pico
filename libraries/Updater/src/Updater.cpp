@@ -25,8 +25,6 @@
 #include <hardware/flash.h>
 #include <PicoOTA.h>
 
-#define DEBUG_UPDATER Serial
-
 #include <Updater_Signing.h>
 #ifndef ARDUINO_SIGNING
 #define ARDUINO_SIGNING 0
@@ -131,7 +129,7 @@ bool UpdaterClass::begin(size_t size, int command) {
     _command = command;
 
 #ifdef DEBUG_UPDATER
-    DEBUG_UPDATER.printf_P(PSTR("[begin] _startAddress:     0x%08X (%d)\n"), _startAddress, _startAddress);
+    DEBUG_UPDATER.printf_P(PSTR("[begin] _startAddress:     0x%08lX (%lu)\n"), _startAddress, _startAddress);
     DEBUG_UPDATER.printf_P(PSTR("[begin] _size:             0x%08zX (%zd)\n"), _size, _size);
 #endif
 
@@ -190,7 +188,7 @@ bool UpdaterClass::end(bool evenIfRemaining) {
             _fp.read((uint8_t *)&sigLen, sizeof(uint32_t));
         }
 #ifdef DEBUG_UPDATER
-        DEBUG_UPDATER.printf_P(PSTR("[Updater] sigLen: %d\n"), sigLen);
+        DEBUG_UPDATER.printf_P(PSTR("[Updater] sigLen: %lu\n"), sigLen);
 #endif
         if (sigLen != expectedSigLen) {
             _setError(UPDATE_ERROR_SIGN);
@@ -200,7 +198,7 @@ bool UpdaterClass::end(bool evenIfRemaining) {
 
         int binSize = _size;
         if (expectedSigLen > 0) {
-            _size -= (sigLen + sizeof(uint32_t) /* The siglen word */);
+            binSize -= (sigLen + sizeof(uint32_t) /* The siglen word */);
         }
         _hash->begin();
 #ifdef DEBUG_UPDATER
@@ -278,7 +276,7 @@ bool UpdaterClass::end(bool evenIfRemaining) {
         picoOTA.addFile("firmware.bin");
         picoOTA.commit();
 #ifdef DEBUG_UPDATER
-        DEBUG_UPDATER.printf_P(PSTR("Staged: address:0x%08X, size:0x%08zX\n"), _startAddress, _size);
+        DEBUG_UPDATER.printf_P(PSTR("Staged: address:0x%08lX, size:0x%08zX\n"), _startAddress, _size);
 #endif
     }
 
@@ -414,30 +412,37 @@ void UpdaterClass::_setError(int error) {
 }
 
 void UpdaterClass::printError(Print &out) {
-    out.printf_P(PSTR("ERROR[%u]: "), _error);
+    String err;
+    err = "ERROR[";
+    err += _error;
+    err += "]: ";
     if (_error == UPDATE_ERROR_OK) {
-        out.println(F("No Error"));
+        err += "No Error";
     } else if (_error == UPDATE_ERROR_WRITE) {
-        out.println(F("Flash Write Failed"));
+        err += "Flash Write Failed";
     } else if (_error == UPDATE_ERROR_ERASE) {
-        out.println(F("Flash Erase Failed"));
+        err += "Flash Erase Failed";
     } else if (_error == UPDATE_ERROR_READ) {
-        out.println(F("Flash Read Failed"));
+        err += "Flash Read Failed";
     } else if (_error == UPDATE_ERROR_SPACE) {
-        out.println(F("Not Enough Space"));
+        err += "Not Enough Space";
     } else if (_error == UPDATE_ERROR_SIZE) {
-        out.println(F("Bad Size Given"));
+        err += "Bad Size Given";
     } else if (_error == UPDATE_ERROR_STREAM) {
-        out.println(F("Stream Read Timeout"));
+        err += "Stream Read Timeout";
     } else if (_error == UPDATE_ERROR_NO_DATA) {
-        out.println(F("No data supplied"));
+        err += "No data supplied";
     } else if (_error == UPDATE_ERROR_MD5) {
-        out.printf_P(PSTR("MD5 Failed: expected:%s, calculated:%s\n"), _target_md5.c_str(), _md5.toString().c_str());
+        err += "MD5 Failed: expected:";
+        err += _target_md5.c_str();
+        err += " calculated:";
+        err += _md5.toString();
     } else if (_error == UPDATE_ERROR_SIGN) {
-        out.println(F("Signature verification failed"));
+        err += "Signature verification failed";
     } else {
-        out.println(F("UNKNOWN"));
+        err += "UNKNOWN";
     }
+    out.println(err.c_str());
 }
 
 UpdaterClass Update;

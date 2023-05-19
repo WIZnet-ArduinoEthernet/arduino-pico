@@ -21,8 +21,7 @@
 
 #pragma once
 #include <Arduino.h>
-#include <vector>
-#include "AudioRingBuffer.h"
+#include "AudioBufferManager.h"
 
 class I2S : public Stream {
 public:
@@ -34,6 +33,8 @@ public:
     bool setBitsPerSample(int bps);
     bool setBuffers(size_t buffers, size_t bufferWords, int32_t silenceSample = 0);
     bool setFrequency(int newFreq);
+    bool setLSBJFormat();
+    bool swapClocks();
 
     bool begin(long sampleRate) {
         setFrequency(sampleRate);
@@ -74,7 +75,7 @@ public:
         return write((uint32_t)s);
     }
 
-    // Write 32 bit value to port, user responsbile for packing/alignment, etc.
+    // Write 32 bit value to port, user responsible for packing/alignment, etc.
     size_t write(int32_t val, bool sync);
 
     // Write sample to I2S port, will block until completed
@@ -83,7 +84,7 @@ public:
     size_t write24(int32_t l, int32_t r); // Note that 24b must have values left-aligned (i.e. 0xABCDEF00)
     size_t write32(int32_t l, int32_t r);
 
-    // Read 32 bit value to port, user responsbile for packing/alignment, etc.
+    // Read 32 bit value to port, user responsible for packing/alignment, etc.
     size_t read(int32_t *val, bool sync);
 
     // Read samples from I2S port, will block until data available
@@ -105,7 +106,9 @@ private:
     size_t _buffers;
     size_t _bufferWords;
     int32_t _silenceSample;
+    bool _isLSBJ;
     bool _isOutput;
+    bool _swapClocks;
 
     bool _running;
 
@@ -117,11 +120,11 @@ private:
     bool _writtenHalf;
 
     int32_t _holdWord = 0;
-    int _wasHolding = 0;
+    int _isHolding = 0;
 
     void (*_cb)();
 
-    AudioRingBuffer *_arb;
+    AudioBufferManager *_arb;
     PIOProgram *_i2s;
     PIO _pio;
     int _sm;

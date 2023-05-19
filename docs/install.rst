@@ -5,18 +5,10 @@ The Arduino-Pico core can be installed using the Arduino IDE Boards Manager
 or using `git`.  If you want to simply write programs for your RP2040 board,
 the Boards Manager installation will suffice, but if you want to try the
 latest pre-release versions and submit improvements, you will need the `git`
-instllation.
+installation.
 
 Installing via Arduino Boards Manager
 -------------------------------------
-**Note for Windows Users**: Please do not use the Windows Store version of
-the actual Arduino application because it has issues detecting attached Pico
-boards.  Use the "Windows ZIP" or plain "Windows" executable (EXE) download
-direct from https://arduino.cc. and allow it to install any device drivers
-it suggests.  Otherwise the Pico board may not be detected.  Also, if trying
-out the 2.0 beta Arduino please install the release 1.8 version beforehand
-to ensure needed device drivers are present.
-
 1. Open up the Arduino IDE and go to File->Preferences.
 2. In the dialog that pops up, enter the following URL in the "Additional Boards Manager URLs" field:  https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
 
@@ -27,6 +19,40 @@ to ensure needed device drivers are present.
 5. Type "pico" in the search box and select "Add":
 
    .. image:: images/install2.png
+
+Arduino IDE Installation Warning
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+**Note for Windows Users**: Please do not use the Windows Store version of
+the actual Arduino application because it has issues detecting attached Pico
+boards.  Use the "Windows ZIP" or plain "Windows" executable (EXE) download
+direct from https://arduino.cc. and allow it to install any device drivers
+it suggests.  Otherwise the Pico board may not be detected.  Also, if trying
+out the 2.0 beta Arduino please install the release 1.8 version beforehand
+to ensure needed device drivers are present.
+
+**Note for Linux Users**: If you installed the Arduino IDE using Flatpak, which 
+is common in Pop!_OS, Fedora, and Mint, among others, you may need to configure 
+Flatpak to allow the IDE access to files outside your home folder. The RP2040 
+device is sometimes mounted as a folder in /opt or /media, which Flatpak will 
+prevent the Arduino IDE from accessing. For Arduino IDE V2, override the filesystem
+restriction using ``flatpak override --user --filesystem=host cc.arduino.IDE2`` . For 
+For Arduino IDE < V2, use ``flatpak override --user --filesystem=host cc.arduino.arduinoide``.
+
+Installing via Arduino CLI
+--------------------------
+To install using the Arduino command line tool (arduino-cli):
+
+.. code:: bash
+
+        arduino-cli config add board_manager.additional_urls https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+        arduino-cli core update-index
+        arduino-cli core install rp2040:rp2040
+
+To list the supported boards:
+
+.. code:: bash
+
+        arduino-cli board listall | grep rp2040
 
 Installing via GIT
 ------------------
@@ -65,25 +91,14 @@ Them hit the upload button and your sketch should upload and run.
 In some cases the Pico will encounter a hard hang and its USB port will not respond to the auto-reset request.  Should this happen, just
 follow the initial procedure of holding the BOOTSEL button down while plugging in the Pico to enter the ROM bootloader.
 
-Unable to Upload First Sketch
------------------------------
-If the Arduino IDE has never seen a serial port from a working device (Pico, AVR, or any other serial port), you
-may not be able to install using the prior directions because the ``Tools->Port`` menu will be grayed out and
-empty.  In this case, a special workaround identified by @fjansson in `this issue report <https://github.com/earlephilhower/arduino-pico/issues/688>`_ .
+Uploading the First Sketch
+--------------------------
+The first time you upload a sketch to a board, you'll need to use the built-in ROM bootloader to handle the upload and not a serial port.
 
-To allow subsequent uploads to automatically work, you will need to manually install a UF2 binary onto the Raspberry Pi Pico one time to
-allow it to present a Serial port for the Arduino IDE to detect and save. 
-
-Perform the following steps to program a dummy sketch:
-
-1. Open a new, empty sketch (doesn't work with a read-only example sketch).
-2. Compile it by pressing the "Verify" checkmark button.
-3. Select the ``Sketch -> Export Compiled Binary`` menu. Select a location e.g. the desktop. A folder is created there, containing a file ending in .uf2
-4. Copy this file to the Pico's drive, by drag and drop in the Explorer.
-
-The Pico restarts and now now has a serial port. Now the Port menu in Arduino is not gray anymore, select the port there.
-After this, normal uploading from the Arduino editor should work.
-
+1. Hold the BOOTSEL button while plugging in the board.
+2. Select ``Tools->Port->UF2 Board`` from the menu.
+3. Upload as normal.
+4. After the board boots up, select the new serial port from the ``Tools->Port`` menu.
 
 Windows 7 Driver Notes
 ----------------------
@@ -135,6 +150,28 @@ To install, follow the directions in
 For detailed usage information, please check the repo documentation available at
 
 * https://arduino-pico.readthedocs.io/en/latest/fs.html
+
+Uploading Sketches with Picotool
+--------------------------------
+Because the Picotool uses a custom device driver in the Pico to handle upload, when using the ``Upload Method->Picotool`` mode custom code needs to be run on the Pico which is not included by default for compatibility and code savings.
+
+So for the first sketch you will need to rebuild (with the ``Upload Method->Picotool`` selected in them menus) and then manually hold down BOOTSEL and insert the Pico USB cable to enter the ROM bootloader.
+
+After the initial upload, as long as the running binary was built using the ``Picotool`` upload method, then the normal upload process should work.
+
+Under MacOS, it may be necessary to install the USB support libraries from a command terminal before the ``Picotool`` upload method can be used:
+
+.. code::
+
+        brew install libusb
+
+For Ubuntu and other Linux operating systems you may need to add the following lines to a new `udev` config file(``99-picotool.rules``) to allow normal users to access the special USB device the Pico exports:
+
+.. code::
+
+        echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="0003", MODE="660", GROUP="plugdev"' | sudo tee -a /etc/udev/rules.d/98-Picotool.rules
+        echo 'SUBSYSTEM=="usb", ATTRS{idVendor}=="2e8a", ATTRS{idProduct}=="000a", MODE="660", GROUP="plugdev"' | sudo tee -a /etc/udev/rules.d/98-Picotool.rules
+        sudo udevadm control --reload
 
 Uploading Sketches with Picoprobe
 ---------------------------------

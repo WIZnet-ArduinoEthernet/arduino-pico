@@ -50,7 +50,9 @@ enum SeekMode {
 
 class File : public Stream {
 public:
-    File(FileImplPtr p = FileImplPtr(), FS *baseFS = nullptr) : _p(p), _fakeDir(nullptr), _baseFS(baseFS) { }
+    File(FileImplPtr p = FileImplPtr(), FS *baseFS = nullptr) : _p(p), _fakeDir(nullptr), _baseFS(baseFS) {
+        _startMillis = millis(); /* workaround -O3 spurious warning #768 */
+    }
 
     // Print methods:
     size_t write(uint8_t) override;
@@ -238,7 +240,7 @@ protected:
     }
     time_t (*_timeCallback)(void) = nullptr;
     static time_t _defaultTimeCB(void) {
-        return time(NULL);
+        return time(nullptr);
     }
 };
 

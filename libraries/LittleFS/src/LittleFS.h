@@ -23,9 +23,7 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-
-#ifndef __LITTLEFS_H
-#define __LITTLEFS_H
+#pragma once
 
 #include <limits>
 #include <FS.h>
@@ -459,14 +457,14 @@ public:
                 if (_creation) {
                     int rc = lfs_setattr(_fs->getFS(), _name.get(), 'c', (const void *)&_creation, sizeof(_creation));
                     if (rc < 0) {
-                        DEBUGV("Unable to set creation time on '%s' to %d\n", _name.get(), _creation);
+                        DEBUGV("Unable to set creation time on '%s' to %lld\n", _name.get(), _creation);
                     }
                 }
                 // Add metadata with last write time
                 time_t now = _timeCallback();
                 int rc = lfs_setattr(_fs->getFS(), _name.get(), 't', (const void *)&now, sizeof(now));
                 if (rc < 0) {
-                    DEBUGV("Unable to set last write time on '%s' to %d\n", _name.get(), now);
+                    DEBUGV("Unable to set last write time on '%s' to %lld\n", _name.get(), now);
                 }
             }
         }
@@ -681,6 +679,3 @@ protected:
 extern FS LittleFS;
 using littlefs_impl::LittleFSConfig;
 #endif // ARDUINO
-
-
-#endif // !defined(__LITTLEFS_H)

@@ -22,18 +22,14 @@
 #include "RP2040USB.h"
 #include <pico/stdlib.h>
 #include <pico/multicore.h>
-#include "LWIPMutex.h"
 #include <reent.h>
 
 RP2040 rp2040;
 extern "C" {
     volatile bool __otherCoreIdled = false;
-    int __holdUpPendSV = 0;
 };
 
 mutex_t _pioMutex;
-
-int LWIPMutex::_ref = 0;
 
 extern void setup();
 extern void loop();
@@ -42,6 +38,8 @@ extern void loop();
 extern void initFreeRTOS() __attribute__((weak));
 extern void startFreeRTOS() __attribute__((weak));
 bool __isFreeRTOS;
+volatile bool __freeRTOSinitted;
+
 
 // Weak empty variant initialization. May be redefined by variant files.
 void initVariant() __attribute__((weak));
@@ -126,7 +124,6 @@ extern "C" int main() {
     }
 #endif
 
-#ifndef NO_USB
     if (!__isFreeRTOS) {
         if (setup1 || loop1) {
             rp2040.fifo.begin(2);
@@ -135,7 +132,6 @@ extern "C" int main() {
         }
         rp2040.fifo.registerCore();
     }
-#endif
 
     if (!__isFreeRTOS) {
         if (setup1 || loop1) {
@@ -166,8 +162,7 @@ extern "C" void __register_impure_ptr(struct _reent *p) {
     }
 }
 
-
-// TODO:  FreeRTOS should implement this based on thread ID (and each thread should have its own struct _reent
+extern "C" struct _reent *__wrap___getreent() __attribute__((weak));
 extern "C" struct _reent *__wrap___getreent() {
     if (get_core_num() == 0) {
         return _impure_ptr;
@@ -175,3 +170,30 @@ extern "C" struct _reent *__wrap___getreent() {
         return _impure_ptr1;
     }
 }
+
+// ESP8266 internal debug routine
+extern void hexdump(const void* mem, uint32_t len, uint8_t cols)  __attribute__((weak));
+void hexdump(const void* mem, uint32_t len, uint8_t cols) {
+    const char* src = (const char*)mem;
+    printf("\n[HEXDUMP] Address: %p len: 0x%lX (%ld)", src, len, len);
+    while (len > 0) {
+        uint32_t linesize = cols > len ? len : cols;
+        printf("\n[%p] 0x%04x: ", src, (int)(src - (const char*)mem));
+        for (uint32_t i = 0; i < linesize; i++) {
+            printf("%02x ", *(src + i));
+        }
+        printf("  ");
+        for (uint32_t i = linesize; i < cols; i++) {
+            printf("   ");
+        }
+        for (uint32_t i = 0; i < linesize; i++) {
+            unsigned char c = *(src + i);
+            putc(isprint(c) ? c : '.', stdout);
+        }
+        src += linesize;
+        len -= linesize;
+    }
+    printf("\n");
+}
+
+const String emptyString = "";

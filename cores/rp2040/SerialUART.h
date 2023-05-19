@@ -63,18 +63,29 @@ public:
     bool overflow();
     operator bool() override;
 
+    // ESP8266 compat
+    void setDebugOutput(bool unused) {
+        (void) unused;
+    }
+
     // Not to be called by users, only from the IRQ handler.  In public so that the C-language IQR callback can access it
     void _handleIRQ(bool inIRQ = true);
+
+    // Allows the user to sleep until a break is received (self-clears the flag
+    // on read)
+    bool getBreakReceived();
 
 private:
     bool _running = false;
     uart_inst_t *_uart;
     pin_size_t _tx, _rx;
     pin_size_t _rts, _cts;
+    enum gpio_function _fcnTx, _fcnRx, _fcnRts, _fcnCts;
     int _baud;
     mutex_t _mutex;
     bool _polling = false;
     bool _overflow;
+    bool _break;
 
     // Lockless, IRQ-handled circular queue
     uint32_t _writer;

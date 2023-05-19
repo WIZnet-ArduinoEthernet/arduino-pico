@@ -16,7 +16,9 @@ For the latest version, always check https://github.com/earlephilhower/arduino-p
    :maxdepth: 2
    :caption: Contents:
 
-   Getting Help and Contributing <help>
+   Getting Help <help>
+   Contributing <contrib>
+
    Installation <install>
    IDE Menus <ide>
 
@@ -30,6 +32,8 @@ For the latest version, always check https://github.com/earlephilhower/arduino-p
    Digital I/O <digital>
    EEPROM <eeprom>
    I2S Audio <i2s>
+   PWM Audio <pwm>
+   Microphone (and Analog Sensor) Input <adc>
    Serial USB and UARTs <serial>
    "Software Serial" PIO UART <piouart>
    Servo <servo>
@@ -38,6 +42,10 @@ For the latest version, always check https://github.com/earlephilhower/arduino-p
    File Systems (SD, SDFS, LittleFS) <fs>
    USB (Arduino and Adafruit_TinyUSB) <usb>
    Multicore Processing <multicore>
+
+   Bluetooth (Alpha/Beta) <bluetooth>
+
+   Single File USB Drive <singlefile>
 
    FreeRTOS SMP (multicore) <freertos>
 
@@ -49,6 +57,8 @@ For the latest version, always check https://github.com/earlephilhower/arduino-p
    BearSSL Encrypted TLS <bearssl>
    WiFiClientSecure (TLS/SSL/HTTPS) <bearssl-client-secure-class>
    WiFiServerSecure (TLS/SSL/HTTPS) <bearssl-server-secure-class>
+
+   HTTP/HTTPS Client <httpclient>
 
    Over-the-Air (OTA) Updates <ota>
 

@@ -17,8 +17,7 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef __SD_H__
-#define __SD_H__
+#pragma once
 
 #include <Arduino.h>
 #include <FS.h>
@@ -27,13 +26,17 @@
 #undef FILE_READ
 #define FILE_READ O_READ
 #undef FILE_WRITE
-#define FILE_WRITE (O_READ | O_WRITE | O_CREAT | O_APPEND)
+#define FILE_WRITE (O_RDWR | O_CREAT | O_APPEND)
 
 
 class SDClass {
 public:
-    boolean begin(uint8_t csPin, uint32_t cfg = SPI_HALF_SPEED) {
-        SDFS.setConfig(SDFSConfig(csPin, cfg));
+    boolean begin(uint8_t csPin, HardwareSPI &spi) {
+        SDFS.setConfig(SDFSConfig(csPin, SPI_HALF_SPEED, spi));
+        return (boolean)SDFS.begin();
+    }
+    boolean begin(uint8_t csPin, uint32_t cfg = SPI_HALF_SPEED, HardwareSPI &spi = SPI) {
+        SDFS.setConfig(SDFSConfig(csPin, cfg, spi));
         return (boolean)SDFS.begin();
     }
 
@@ -159,9 +162,23 @@ public:
 
 private:
     const char *getMode(uint8_t mode) {
-        bool read = (mode & O_READ) ? true : false;
-        bool write = (mode & O_WRITE) ? true : false;
-        bool append = (mode & O_APPEND) ? true : false;
+        bool read = false;
+        bool write = false;
+
+        switch (mode & O_ACCMODE) {
+        case O_RDONLY:
+            read = true;
+            break;
+        case O_WRONLY:
+            write = true;
+            break;
+        case O_RDWR:
+            read = true;
+            write = true;
+            break;
+        }
+        const bool append = (mode & O_APPEND) > 0;
+
         if (read & !write)           {
             return "r";
         } else if (!read &  write & !append) {
@@ -213,6 +230,4 @@ static inline uint8_t FAT_SECOND(uint16_t fatTime) {
 
 #if !defined(NO_GLOBAL_INSTANCES) && !defined(NO_GLOBAL_SD)
 extern SDClass SD;
-#endif
-
 #endif

@@ -25,14 +25,18 @@
 #include "CoreMutex.h"
 #include "RP2040USB.h"
 
-#include "tusb.h"
-#include "class/hid/hid_device.h"
-#include "class/audio/audio.h"
-#include "class/midi/midi.h"
-#include "pico/time.h"
-#include "hardware/irq.h"
-#include "pico/mutex.h"
-#include "pico/unique_id.h"
+#include <tusb.h>
+#include <class/hid/hid_device.h>
+#include <class/audio/audio.h>
+#include <pico/time.h>
+#include <hardware/irq.h>
+#include <pico/mutex.h>
+#include <pico/unique_id.h>
+#include <pico/usb_reset_interface.h>
+#include <hardware/watchdog.h>
+#include <pico/bootrom.h>
+#include "sdkoverride/tusb_absmouse.h"
+#include <device/usbd_pvt.h>
 
 // Big, global USB mutex, shared with all USB devices to make sure we don't
 // have multiple cores updating the TUSB state in parallel
@@ -42,12 +46,11 @@ mutex_t __usb_mutex;
 #define USB_TASK_INTERVAL 1000
 static int __usb_task_irq;
 
-// USB VID/PID (note that PID can change depending on the add'l interfaces)
+#ifndef USBD_VID
 #define USBD_VID (0x2E8A) // Raspberry Pi
+#endif
 
-#ifdef SERIALUSB_PID
-#define USBD_PID (SERIALUSB_PID)
-#else
+#ifndef USBD_PID
 #define USBD_PID (0x000a) // Raspberry Pi Pico SDK CDC
 #endif
 
@@ -67,11 +70,17 @@ static int __usb_task_irq;
 #define USBD_STR_PRODUCT (0x02)
 #define USBD_STR_SERIAL (0x03)
 #define USBD_STR_CDC (0x04)
-
+#define USBD_STR_RPI_RESET (0x05)
 
 #define EPNUM_HID   0x83
 
-#define EPNUM_MIDI   0x01
+#define USBD_MSC_EPOUT 0x03
+#define USBD_MSC_EPIN 0x84
+#define USBD_MSC_EPSIZE 64
+
+#define TUD_RPI_RESET_DESCRIPTOR(_itfnum, _stridx) \
+  /* Interface */\
+  9, TUSB_DESC_INTERFACE, _itfnum, 0, 0, TUSB_CLASS_VENDOR_SPECIFIC, RESET_INTERFACE_SUBCLASS, RESET_INTERFACE_PROTOCOL, _stridx,
 
 
 const uint8_t *tud_descriptor_device_cb(void) {
@@ -91,7 +100,7 @@ const uint8_t *tud_descriptor_device_cb(void) {
         .iSerialNumber = USBD_STR_SERIAL,
         .bNumConfigurations = 1
     };
-    if (__USBInstallSerial && !__USBInstallKeyboard && !__USBInstallMouse && !__USBInstallJoystick && !__USBInstallMIDI) {
+    if (__USBInstallSerial && !__USBInstallKeyboard && !__USBInstallMouse && !__USBInstallAbsoluteMouse && !__USBInstallJoystick && !__USBInstallMassStorage) {
         // Can use as-is, this is the default USB case
         return (const uint8_t *)&usbd_desc_device;
     }
@@ -99,14 +108,14 @@ const uint8_t *tud_descriptor_device_cb(void) {
     if (__USBInstallKeyboard) {
         usbd_desc_device.idProduct |= 0x8000;
     }
-    if (__USBInstallMouse) {
+    if (__USBInstallMouse || __USBInstallAbsoluteMouse) {
         usbd_desc_device.idProduct |= 0x4000;
     }
     if (__USBInstallJoystick) {
         usbd_desc_device.idProduct |= 0x0100;
     }
-    if (__USBInstallMIDI) {
-        usbd_desc_device.idProduct |= 0x2000;
+    if (__USBInstallMassStorage) {
+        usbd_desc_device.idProduct ^= 0x2000;
     }
     // Set the device class to 0 to indicate multiple device classes
     usbd_desc_device.bDeviceClass = 0;
@@ -120,15 +129,15 @@ int __USBGetKeyboardReportID() {
 }
 
 int __USBGetMouseReportID() {
-    return __USBInstallKeyboard ? 2 : 1;
+    return __USBInstallKeyboard ? 3 : 1;
 }
 
 int __USBGetJoystickReportID() {
     int i = 1;
     if (__USBInstallKeyboard) {
-        i++;
+        i += 2;
     }
-    if (__USBInstallMouse) {
+    if (__USBInstallMouse || __USBInstallAbsoluteMouse) {
         i++;
     }
     return i;
@@ -147,8 +156,9 @@ static uint8_t *GetDescHIDReport(int *len) {
 void __SetupDescHIDReport() {
     //allocate memory for the HID report descriptors. We don't use them, but need the size here.
     uint8_t desc_hid_report_mouse[] = { TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(1)) };
+    uint8_t desc_hid_report_absmouse[] = { TUD_HID_REPORT_DESC_ABSMOUSE(HID_REPORT_ID(1)) };
     uint8_t desc_hid_report_joystick[] = { TUD_HID_REPORT_DESC_GAMEPAD(HID_REPORT_ID(1)) };
-    uint8_t desc_hid_report_keyboard[] = { TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(1)) };
+    uint8_t desc_hid_report_keyboard[] = { TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(1)), TUD_HID_REPORT_DESC_CONSUMER(HID_REPORT_ID(2)) };
     int size = 0;
 
     //accumulate the size of all used HID report descriptors
@@ -157,6 +167,8 @@ void __SetupDescHIDReport() {
     }
     if (__USBInstallMouse) {
         size += sizeof(desc_hid_report_mouse);
+    } else if (__USBInstallAbsoluteMouse) {
+        size += sizeof(desc_hid_report_absmouse);
     }
     if (__USBInstallJoystick) {
         size += sizeof(desc_hid_report_joystick);
@@ -185,10 +197,18 @@ void __SetupDescHIDReport() {
         if (__USBInstallMouse) {
             //determine if we need an offset (USB keyboard is installed)
             if (__USBInstallKeyboard) {
-                uint8_t desc_local[] = { TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(2)) };
+                uint8_t desc_local[] = { TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(3)) };
                 memcpy(__hid_report + sizeof(desc_hid_report_keyboard), desc_local, sizeof(desc_local));
             } else {
                 memcpy(__hid_report, desc_hid_report_mouse, sizeof(desc_hid_report_mouse));
+            }
+        } else if (__USBInstallAbsoluteMouse) {
+            //determine if we need an offset (USB keyboard is installed)
+            if (__USBInstallKeyboard) {
+                uint8_t desc_local[] = { TUD_HID_REPORT_DESC_ABSMOUSE(HID_REPORT_ID(3)) };
+                memcpy(__hid_report + sizeof(desc_hid_report_keyboard), desc_local, sizeof(desc_local));
+            } else {
+                memcpy(__hid_report, desc_hid_report_absmouse, sizeof(desc_hid_report_absmouse));
             }
         }
 
@@ -197,12 +217,15 @@ void __SetupDescHIDReport() {
             uint8_t reportid = 1;
             int offset = 0;
             if (__USBInstallKeyboard) {
-                reportid++;
+                reportid += 2;
                 offset += sizeof(desc_hid_report_keyboard);
             }
             if (__USBInstallMouse) {
                 reportid++;
                 offset += sizeof(desc_hid_report_mouse);
+            } else if (__USBInstallAbsoluteMouse) {
+                reportid++;
+                offset += sizeof(desc_hid_report_absmouse);
             }
             uint8_t desc_local[] = { TUD_HID_REPORT_DESC_GAMEPAD(HID_REPORT_ID(reportid)) };
             memcpy(__hid_report + offset, desc_local, sizeof(desc_local));
@@ -226,9 +249,9 @@ const uint8_t *tud_descriptor_configuration_cb(uint8_t index) {
 
 void __SetupUSBDescriptor() {
     if (!usbd_desc_cfg) {
-        bool hasHID = __USBInstallKeyboard || __USBInstallMouse || __USBInstallJoystick;
+        bool hasHID = __USBInstallKeyboard || __USBInstallMouse || __USBInstallAbsoluteMouse || __USBInstallJoystick;
 
-        uint8_t interface_count = (__USBInstallSerial ? 2 : 0) + (hasHID ? 1 : 0) + (__USBInstallMIDI ? 2 : 0);
+        uint8_t interface_count = (__USBInstallSerial ? 2 : 0) + (hasHID ? 1 : 0) + (__USBInstallMassStorage ? 1 : 0);
 
         uint8_t cdc_desc[TUD_CDC_DESC_LEN] = {
             // Interface number, string index, protocol, report descriptor len, EP In & Out address, size & polling interval
@@ -243,13 +266,20 @@ void __SetupUSBDescriptor() {
             TUD_HID_DESCRIPTOR(hid_itf, 0, HID_ITF_PROTOCOL_NONE, hid_report_len, EPNUM_HID, CFG_TUD_HID_EP_BUFSIZE, 10)
         };
 
-        uint8_t midi_itf = hid_itf + (hasHID ? 1 : 0);
-        uint8_t midi_desc[TUD_MIDI_DESC_LEN] = {
-            // Interface number, string index, EP Out & EP In address, EP size
-            TUD_MIDI_DESCRIPTOR(midi_itf, 0, EPNUM_MIDI, 0x80 | EPNUM_MIDI, 64)
+        uint8_t msd_itf = interface_count - 1;
+        uint8_t msd_desc[TUD_MSC_DESC_LEN] = {
+            TUD_MSC_DESCRIPTOR(msd_itf, 0, USBD_MSC_EPOUT, USBD_MSC_EPIN, USBD_MSC_EPSIZE)
         };
 
-        int usbd_desc_len = TUD_CONFIG_DESC_LEN + (__USBInstallSerial ? sizeof(cdc_desc) : 0) + (hasHID ? sizeof(hid_desc) : 0) + (__USBInstallMIDI ? sizeof(midi_desc) : 0);
+        int usbd_desc_len = TUD_CONFIG_DESC_LEN + (__USBInstallSerial ? sizeof(cdc_desc) : 0) + (hasHID ? sizeof(hid_desc) : 0) + (__USBInstallMassStorage ? sizeof(msd_desc) : 0);
+
+#ifdef ENABLE_PICOTOOL_USB
+        uint8_t picotool_itf = interface_count++;
+        uint8_t picotool_desc[] = {
+            TUD_RPI_RESET_DESCRIPTOR(picotool_itf, USBD_STR_RPI_RESET)
+        };
+        usbd_desc_len += sizeof(picotool_desc);
+#endif
 
         uint8_t tud_cfg_desc[TUD_CONFIG_DESC_LEN] = {
             // Config number, interface count, string index, total length, attribute, power in mA
@@ -271,26 +301,34 @@ void __SetupUSBDescriptor() {
                 memcpy(ptr, hid_desc, sizeof(hid_desc));
                 ptr += sizeof(hid_desc);
             }
-            if (__USBInstallMIDI) {
-                memcpy(ptr, midi_desc, sizeof(midi_desc));
+            if (__USBInstallMassStorage) {
+                memcpy(ptr, msd_desc, sizeof(msd_desc));
+                ptr += sizeof(msd_desc);
             }
+#ifdef ENABLE_PICOTOOL_USB
+            memcpy(ptr, picotool_desc, sizeof(picotool_desc));
+            ptr += sizeof(picotool_desc);
+#endif
         }
     }
 }
 
 const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
     (void) langid;
-#define DESC_STR_MAX (20)
+#define DESC_STR_MAX (32)
     static uint16_t desc_str[DESC_STR_MAX];
 
     static char idString[PICO_UNIQUE_BOARD_ID_SIZE_BYTES * 2 + 1];
 
     static const char *const usbd_desc_str[] = {
         [USBD_STR_0] = "",
-        [USBD_STR_MANUF] = "Raspberry Pi",
-        [USBD_STR_PRODUCT] = "PicoArduino",
+        [USBD_STR_MANUF] = USB_MANUFACTURER,
+        [USBD_STR_PRODUCT] = USB_PRODUCT,
         [USBD_STR_SERIAL] = idString,
         [USBD_STR_CDC] = "Board CDC",
+#ifdef ENABLE_PICOTOOL_USB
+        [USBD_STR_RPI_RESET] = "Reset",
+#endif
     };
 
     if (!idString[0]) {
@@ -303,7 +341,7 @@ const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid) {
         len = 1;
     } else {
         if (index >= sizeof(usbd_desc_str) / sizeof(usbd_desc_str[0])) {
-            return NULL;
+            return nullptr;
         }
         const char *str = usbd_desc_str[index];
         for (len = 0; len < DESC_STR_MAX - 1 && str[len]; ++len) {
@@ -322,7 +360,7 @@ static void usb_irq() {
     // if the mutex is already owned, then we are in user code
     // in this file which will do a tud_task itself, so we'll just do nothing
     // until the next tick; we won't starve
-    if (mutex_try_enter(&__usb_mutex, NULL)) {
+    if (mutex_try_enter(&__usb_mutex, nullptr)) {
         tud_task();
         mutex_exit(&__usb_mutex);
     }
@@ -352,13 +390,14 @@ void __USBStart() {
     irq_set_exclusive_handler(__usb_task_irq, usb_irq);
     irq_set_enabled(__usb_task_irq, true);
 
-    add_alarm_in_us(USB_TASK_INTERVAL, timer_task, NULL, true);
+    add_alarm_in_us(USB_TASK_INTERVAL, timer_task, nullptr, true);
 }
 
 
 // Invoked when received GET_REPORT control request
 // Application must fill buffer report's content and return its length.
 // Return zero will cause the stack to STALL request
+extern "C" uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t* buffer, uint16_t reqlen) __attribute__((weak));
 extern "C" uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t* buffer, uint16_t reqlen) {
     // TODO not implemented
     (void) instance;
@@ -372,6 +411,7 @@ extern "C" uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, h
 
 // Invoked when received SET_REPORT control request or
 // received data on OUT endpoint ( Report ID = 0, Type = 0 )
+extern "C" void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize) __attribute__((weak));
 extern "C" void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t const* buffer, uint16_t bufsize) {
     // TODO set LED based on CAPLOCK, NUMLOCK etc...
     (void) instance;
@@ -380,5 +420,189 @@ extern "C" void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_r
     (void) buffer;
     (void) bufsize;
 }
+
+extern "C" int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize) __attribute__((weak));
+extern "C" int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset, void* buffer, uint32_t bufsize) {
+    (void) lun;
+    (void) lba;
+    (void) offset;
+    (void) buffer;
+    (void) bufsize;
+    return -1;
+}
+
+extern "C" bool tud_msc_test_unit_ready_cb(uint8_t lun) __attribute__((weak));
+extern "C" bool tud_msc_test_unit_ready_cb(uint8_t lun) {
+    (void) lun;
+    return false;
+}
+
+extern "C" int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize) __attribute__((weak));
+extern "C" int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset, uint8_t* buffer, uint32_t bufsize) {
+    (void) lun;
+    (void) lba;
+    (void) offset;
+    (void) buffer;
+    (void) bufsize;
+    return -1;
+}
+
+extern "C" int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, uint16_t bufsize) __attribute__((weak));
+extern "C" int32_t tud_msc_scsi_cb(uint8_t lun, uint8_t const scsi_cmd[16], void* buffer, uint16_t bufsize) {
+    (void) lun;
+    (void) scsi_cmd;
+    (void) buffer;
+    (void) bufsize;
+    return 0;
+}
+
+extern "C" void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_size) __attribute__((weak));
+extern "C" void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count, uint16_t* block_size) {
+    (void) lun;
+    *block_count = 0;
+    *block_size = 0;
+}
+
+extern "C" void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4]) __attribute__((weak));
+extern "C" void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8], uint8_t product_id[16], uint8_t product_rev[4]) {
+    (void) lun;
+    vendor_id[0] = 0;
+    product_id[0] = 0;
+    product_rev[0] = 0;
+}
+
+
+
+#ifdef ENABLE_PICOTOOL_USB
+
+static uint8_t _picotool_itf_num;
+
+static void resetd_init() {
+}
+
+static void resetd_reset(uint8_t rhport) {
+    (void) rhport;
+    _picotool_itf_num = 0;
+}
+
+static uint16_t resetd_open(uint8_t rhport,
+                            tusb_desc_interface_t const *itf_desc, uint16_t max_len) {
+    (void) rhport;
+    TU_VERIFY(TUSB_CLASS_VENDOR_SPECIFIC == itf_desc->bInterfaceClass &&
+              RESET_INTERFACE_SUBCLASS == itf_desc->bInterfaceSubClass &&
+              RESET_INTERFACE_PROTOCOL == itf_desc->bInterfaceProtocol, 0);
+
+    uint16_t const drv_len = sizeof(tusb_desc_interface_t);
+    TU_VERIFY(max_len >= drv_len, 0);
+
+    _picotool_itf_num = itf_desc->bInterfaceNumber;
+    return drv_len;
+}
+
+// Support for parameterized reset via vendor interface control request
+static bool resetd_control_xfer_cb(uint8_t rhport, uint8_t stage,
+                                   tusb_control_request_t const *request) {
+    (void) rhport;
+    // nothing to do with DATA & ACK stage
+    if (stage != CONTROL_STAGE_SETUP) {
+        return true;
+    }
+
+    if (request->wIndex == _picotool_itf_num) {
+        if (request->bRequest == RESET_REQUEST_BOOTSEL) {
+            reset_usb_boot(0, (request->wValue & 0x7f));
+            // does not return, otherwise we'd return true
+        }
+
+        if (request->bRequest == RESET_REQUEST_FLASH) {
+            watchdog_reboot(0, 0, 100);
+            return true;
+        }
+
+    }
+    return false;
+}
+
+static bool resetd_xfer_cb(uint8_t rhport, uint8_t ep_addr,
+                           xfer_result_t result, uint32_t xferred_bytes) {
+    (void) rhport;
+    (void) ep_addr;
+    (void) result;
+    (void) xferred_bytes;
+    return true;
+}
+
+static usbd_class_driver_t const _resetd_driver = {
+#if CFG_TUSB_DEBUG >= 2
+    .name = "RESET",
+#endif
+    .init             = resetd_init,
+    .reset            = resetd_reset,
+    .open             = resetd_open,
+    .control_xfer_cb  = resetd_control_xfer_cb,
+    .xfer_cb          = resetd_xfer_cb,
+    .sof              = NULL
+};
+
+// Implement callback to add our custom driver
+usbd_class_driver_t const *usbd_app_driver_get_cb(uint8_t *driver_count) {
+    *driver_count = 1;
+    return &_resetd_driver;
+}
+
+#elif defined NO_USB
+
+// will ensure backward compatibility with existing code when using pico-debug
+
+#warning "NO_USB selected. No output to Serial will occur!"
+
+#include <Arduino.h>
+
+void SerialUSB::begin(unsigned long baud) {
+}
+
+void SerialUSB::end() {
+
+}
+
+int SerialUSB::peek() {
+    return 0;
+}
+
+int SerialUSB::read() {
+    return -1;
+}
+
+int SerialUSB::available() {
+    return 0;
+}
+
+int SerialUSB::availableForWrite() {
+    return 0;
+}
+
+void SerialUSB::flush() {
+
+}
+
+size_t SerialUSB::write(uint8_t c) {
+    (void) c;
+    return 0;
+}
+
+size_t SerialUSB::write(const uint8_t *buf, size_t length) {
+    (void) buf;
+    (void) length;
+    return 0;
+}
+
+SerialUSB::operator bool() {
+    return false;
+}
+
+SerialUSB Serial;
+
+#endif
+
 
 #endif

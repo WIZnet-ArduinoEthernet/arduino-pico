@@ -2,7 +2,7 @@
   "build": {
     "arduino": {
       "earlephilhower": {
-        "boot2_source": "boot2_generic_03h_4_padded_checksum.S",
+        "boot2_source": "boot2_w25q080_2_padded_checksum.S",
         "usb_vid": "0x2E8A",
         "usb_pid": "0x008A"
       }
@@ -42,11 +42,13 @@
     "wait_for_upload_port": false,
     "protocol": "picotool",
     "protocols": [
+      "blackmagic",
       "cmsis-dap",
       "jlink",
       "raspberrypi-swd",
       "picotool",
-      "picoprobe"
+      "picoprobe",
+      "pico-debug"
     ]
   },
   "url": "https://www.raspberrypi.org/products/raspberry-pi-pico/",

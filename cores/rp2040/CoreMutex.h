@@ -23,29 +23,18 @@
 
 #pragma once
 
-#include "pico/mutex.h"
+#include <pico/mutex.h>
+#include "_freertos.h"
+
+enum {
+    DebugEnable = 1,
+    FromISR = 1 << 1,
+};
 
 class CoreMutex {
 public:
-    CoreMutex(mutex_t *mutex) {
-        uint32_t owner;
-        _mutex = mutex;
-        _acquired = false;
-        if (!mutex_try_enter(_mutex, &owner)) {
-            if (owner == get_core_num()) { // Deadlock!
-                DEBUGCORE("CoreMutex - Deadlock detected!\n");
-                return;
-            }
-            mutex_enter_blocking(_mutex);
-        }
-        _acquired = true;
-    }
-
-    ~CoreMutex() {
-        if (_acquired) {
-            mutex_exit(_mutex);
-        }
-    }
+    CoreMutex(mutex_t *mutex, uint8_t option = DebugEnable);
+    ~CoreMutex();
 
     operator bool() {
         return _acquired;
@@ -54,4 +43,5 @@ public:
 private:
     mutex_t *_mutex;
     bool _acquired;
+    uint8_t _option;
 };

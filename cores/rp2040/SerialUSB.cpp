@@ -25,14 +25,15 @@
 #include <Arduino.h>
 #include "CoreMutex.h"
 
-#include "tusb.h"
-#include "pico/time.h"
-#include "pico/binary_info.h"
-#include "pico/bootrom.h"
-#include "hardware/irq.h"
-#include "pico/mutex.h"
-#include "hardware/watchdog.h"
-#include "pico/unique_id.h"
+#include <tusb.h>
+#include <pico/time.h>
+#include <pico/binary_info.h>
+#include <pico/bootrom.h>
+#include <hardware/irq.h>
+#include <pico/mutex.h>
+#include <hardware/watchdog.h>
+#include <pico/unique_id.h>
+#include <hardware/resets.h>
 
 #ifndef DISABLE_USB_SERIAL
 // Ensure we are installed in the USB chain
@@ -64,52 +65,57 @@ void SerialUSB::end() {
 }
 
 int SerialUSB::peek() {
-    CoreMutex m(&__usb_mutex);
+    CoreMutex m(&__usb_mutex, false);
     if (!_running || !m) {
         return 0;
     }
 
     uint8_t c;
+    tud_task();
     return tud_cdc_peek(&c) ? (int) c : -1;
 }
 
 int SerialUSB::read() {
-    CoreMutex m(&__usb_mutex);
+    CoreMutex m(&__usb_mutex, false);
     if (!_running || !m) {
         return -1;
     }
 
-    if (tud_cdc_connected() && tud_cdc_available()) {
+    tud_task();
+    if (tud_cdc_available()) {
         return tud_cdc_read_char();
     }
     return -1;
 }
 
 int SerialUSB::available() {
-    CoreMutex m(&__usb_mutex);
+    CoreMutex m(&__usb_mutex, false);
     if (!_running || !m) {
         return 0;
     }
 
+    tud_task();
     return tud_cdc_available();
 }
 
 int SerialUSB::availableForWrite() {
-    CoreMutex m(&__usb_mutex);
+    CoreMutex m(&__usb_mutex, false);
     if (!_running || !m) {
         return 0;
     }
 
+    tud_task();
     return tud_cdc_write_available();
 }
 
 void SerialUSB::flush() {
-    CoreMutex m(&__usb_mutex);
+    CoreMutex m(&__usb_mutex, false);
     if (!_running || !m) {
         return;
     }
 
     tud_cdc_write_flush();
+    tud_task();
 }
 
 size_t SerialUSB::write(uint8_t c) {
@@ -117,7 +123,7 @@ size_t SerialUSB::write(uint8_t c) {
 }
 
 size_t SerialUSB::write(const uint8_t *buf, size_t length) {
-    CoreMutex m(&__usb_mutex);
+    CoreMutex m(&__usb_mutex, false);
     if (!_running || !m) {
         return 0;
     }
@@ -142,7 +148,7 @@ size_t SerialUSB::write(const uint8_t *buf, size_t length) {
                 tud_task();
                 tud_cdc_write_flush();
                 if (!tud_cdc_connected() ||
-                        (!tud_cdc_write_available() && time_us_64() > last_avail_time + 1000000 /* 1 second */)) {
+                        (!tud_cdc_write_available() && time_us_64() > last_avail_time + 1'000'000 /* 1 second */)) {
                     break;
                 }
             }
@@ -151,11 +157,12 @@ size_t SerialUSB::write(const uint8_t *buf, size_t length) {
         // reset our timeout
         last_avail_time = 0;
     }
+    tud_task();
     return written;
 }
 
 SerialUSB::operator bool() {
-    CoreMutex m(&__usb_mutex);
+    CoreMutex m(&__usb_mutex, false);
     if (!_running || !m) {
         return false;
     }
@@ -168,8 +175,20 @@ SerialUSB::operator bool() {
 static bool _dtr = false;
 static bool _rts = false;
 static int _bps = 115200;
+static bool _rebooting = false;
 static void CheckSerialReset() {
-    if ((_bps == 1200) && (!_dtr)) {
+    if (!_rebooting && (_bps == 1200) && (!_dtr)) {
+        if (__isFreeRTOS) {
+            __freertos_idle_other_core();
+        }
+        _rebooting = true;
+        // Disable NVIC IRQ, so that we don't get bothered anymore
+        irq_set_enabled(USBCTRL_IRQ, false);
+        // Reset the whole USB hardware block
+        reset_block(RESETS_RESET_USBCTRL_BITS);
+        unreset_block(RESETS_RESET_USBCTRL_BITS);
+        // Delay a bit, so the PC can figure out that we have disconnected.
+        sleep_ms(3);
         reset_usb_boot(0, 0);
         while (1); // WDT will fire here
     }
