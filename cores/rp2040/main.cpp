@@ -22,7 +22,6 @@
 #include "RP2040USB.h"
 #include <pico/stdlib.h>
 #include <pico/multicore.h>
-#include "LWIPMutex.h"
 #include <reent.h>
 
 RP2040 rp2040;
@@ -33,8 +32,6 @@ extern "C" {
 
 mutex_t _pioMutex;
 
-int LWIPMutex::_ref = 0;
-
 extern void setup();
 extern void loop();
 
@@ -42,6 +39,8 @@ extern void loop();
 extern void initFreeRTOS() __attribute__((weak));
 extern void startFreeRTOS() __attribute__((weak));
 bool __isFreeRTOS;
+volatile bool __freeRTOSinitted;
+
 
 // Weak empty variant initialization. May be redefined by variant files.
 void initVariant() __attribute__((weak));
@@ -126,7 +125,6 @@ extern "C" int main() {
     }
 #endif
 
-#ifndef NO_USB
     if (!__isFreeRTOS) {
         if (setup1 || loop1) {
             rp2040.fifo.begin(2);
@@ -135,7 +133,6 @@ extern "C" int main() {
         }
         rp2040.fifo.registerCore();
     }
-#endif
 
     if (!__isFreeRTOS) {
         if (setup1 || loop1) {
@@ -166,8 +163,6 @@ extern "C" void __register_impure_ptr(struct _reent *p) {
     }
 }
 
-
-// TODO:  FreeRTOS should implement this based on thread ID (and each thread should have its own struct _reent
 extern "C" struct _reent *__wrap___getreent() {
     if (get_core_num() == 0) {
         return _impure_ptr;

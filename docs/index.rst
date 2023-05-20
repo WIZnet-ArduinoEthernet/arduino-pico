@@ -39,6 +39,8 @@ For the latest version, always check https://github.com/earlephilhower/arduino-p
    USB (Arduino and Adafruit_TinyUSB) <usb>
    Multicore Processing <multicore>
 
+   Single File USB Drive <singlefile>
+
    FreeRTOS SMP (multicore) <freertos>
 
    WiFi (Pico-W Support) <wifi>
@@ -49,6 +51,8 @@ For the latest version, always check https://github.com/earlephilhower/arduino-p
    BearSSL Encrypted TLS <bearssl>
    WiFiClientSecure (TLS/SSL/HTTPS) <bearssl-client-secure-class>
    WiFiServerSecure (TLS/SSL/HTTPS) <bearssl-server-secure-class>
+
+   HTTP/HTTPS Client <httpclient>
 
    Over-the-Air (OTA) Updates <ota>
 

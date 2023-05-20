@@ -1,10 +1,6 @@
 /*
-    WiFiMutex.h - Ensure the timer-driven sys_check_timeouts doesn't
-                  get executed while we're in the user-level TCP stack.
-    Copyright (c) 2022 Earle F. Philhower, III.  All rights reserved.
-
-    Implements the API defined by the Arduino WiFiNINA library,
-    copyright (c) 2018 Arduino SA. All rights reserved.
+    WebServerSecure - Create a WebServerSecure class
+    Copyright (c) 2022 Earle F. Philhower, III All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Lesser General Public
@@ -19,23 +15,11 @@
     You should have received a copy of the GNU Lesser General Public
     License along with this library; if not, write to the Free Software
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+    Modified 8 May 2015 by Hristo Gochkov (proper post and file upload handling)
 */
 
 #pragma once
 
-extern "C" volatile bool __inLWIP;
+#include "WebServerTemplate.h"
 
-class LWIPMutex {
-public:
-    LWIPMutex() {
-        __inLWIP = true;
-        _ref++;
-    }
-    ~LWIPMutex() {
-        if (0 == --_ref) {
-            __inLWIP = false;
-        }
-    }
-private:
-    static int _ref;
-};
+using WebServerSecure = WebServerTemplate<WiFiServerSecure, 443>;

@@ -26,7 +26,20 @@ extern "C" {
 #include "pico/cyw43_arch.h"
 #include <Arduino.h>
 
+// From cyw43_ctrl.c
+#define WIFI_JOIN_STATE_KIND_MASK (0x000f)
+#define WIFI_JOIN_STATE_ACTIVE  (0x0001)
+#define WIFI_JOIN_STATE_FAIL    (0x0002)
+#define WIFI_JOIN_STATE_NONET   (0x0003)
+#define WIFI_JOIN_STATE_BADAUTH (0x0004)
+#define WIFI_JOIN_STATE_AUTH    (0x0200)
+#define WIFI_JOIN_STATE_LINK    (0x0400)
+#define WIFI_JOIN_STATE_KEYED   (0x0800)
+#define WIFI_JOIN_STATE_ALL     (0x0e01)
+
+
 netif *CYW43::_netif = nullptr;
+extern "C" volatile bool __inLWIP;
 
 CYW43::CYW43(int8_t cs, arduino::SPIClass& spi, int8_t intrpin) {
     (void) cs;
@@ -87,7 +100,20 @@ uint16_t CYW43::readFrame(uint8_t* buffer, uint16_t bufsize) {
     return 0;
 }
 
-// CB from the cyg32_driver
+//#define MAXWAIT 16
+//static struct pbuf *_pbufWaiting[MAXWAIT];
+//static bool _pbufHold(struct pbuf *p) {
+//    for (int i = 0; i < MAXWAIT; i++) {
+//        if (!_pbufWaiting[i]) {
+//            _pbufWaiting[i] = p;
+//            return true;
+//        }
+//    }
+//    return false;
+//}
+
+
+// CB from the cyw43 driver
 extern "C" void cyw43_cb_process_ethernet(void *cb_data, int itf, size_t len, const uint8_t *buf) {
     //cyw43_t *self = (cyw43_t *)cb_data
     (void) cb_data;
@@ -100,9 +126,9 @@ extern "C" void cyw43_cb_process_ethernet(void *cb_data, int itf, size_t len, co
 #endif
     if (netif->flags & NETIF_FLAG_LINK_UP) {
         struct pbuf *p = pbuf_alloc(PBUF_RAW, len, PBUF_POOL);
-        if (p != NULL) {
+        if (p != nullptr) {
             pbuf_take(p, buf, len);
-            if (netif->input(p, netif) != ERR_OK) {
+            if (__inLWIP || (netif->input(p, netif) != ERR_OK)) {
                 pbuf_free(p);
             }
             CYW43_STAT_INC(PACKET_IN_COUNT);
@@ -124,6 +150,7 @@ extern "C" void cyw43_cb_tcpip_set_link_down(cyw43_t *self, int itf) {
     if (CYW43::_netif) {
         netif_set_link_down(CYW43::_netif);
     }
+    self->wifi_join_state &= ~WIFI_JOIN_STATE_ACTIVE;
 }
 
 extern "C" int cyw43_tcpip_link_status(cyw43_t *self, int itf) {

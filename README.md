@@ -13,6 +13,7 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Raspberry Pi Pico
 * Raspberry Pi Pico W
 * Adafruit Feather RP2040
+* Adafruit Feather RP2040 SCORPIO
 * Adafruit ItsyBitsy RP2040
 * Adafruit KB2040
 * Adafruit Macropad RP2040
@@ -20,11 +21,15 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Adafruit STEMMA Friend RP2040
 * Adafruit Trinkey RP2040 QT
 * Arduino Nano RP2040 Connect
+* BridgeTek IDM2040-7A
 * Cytron Maker Pi RP2040
 * Cytron Maker Nano RP2040
+* DatanoiseTV PicoADK+
+* Degz Mizu
 * DeRuiLab FlyBoard2040 Core
 * DFRobot Beetle RP2040
 * ElectronicCats Hunter Cat NFC
+* ExtremeElectronics RC2040
 * Invector Labs Challenger RP2040 WiFi
 * Invector Labs Challenger RP2040 WiFi/BLE
 * Invector Labs Challenger NB RP2040 WiFi
@@ -33,12 +38,19 @@ See https://arduino-pico.readthedocs.io/en/latest/ along with the examples for m
 * Invector Labs Challenger RP2040 SubGHz
 * Invector Labs Challenger RP2040 SD/RTC
 * Invector Labs RPICO32
+* Melopero Cookie RP2040
 * Melopero Shake RP2040
+* Pimoroni PGA2040
 * Seeed XIAO RP2040
 * Solder Party RP2040 Stamp
 * SparkFun ProMicro RP2040
 * SparkFun Thing Plus RP2040
 * uPesy RP2040 DevKit
+* Waveshare RP2040 Zero
+* Waveshare RP2040 One
+* Waveshare RP2040 Plus
+* Waveshare RP2040 LCD 0.96
+* Waveshare RP2040 LCD 1.28
 * WIZnet W5100S-EVB-Pico
 * WIZnet W5500-EVB-Pico
 * WIZnet W6100-EVB-Pico
@@ -148,6 +160,8 @@ The installed tools include a version of OpenOCD (in the pqt-openocd directory) 
 * Adafruit TinyUSB Arduino (USB mouse, keyboard, flash drive, generic HID, CDC Serial, MIDI, WebUSB, others)
 * Generic Arduino USB Serial, Keyboard, and Mouse emulation
 * WiFi (Pico W)
+* HTTP client and server (WebServer)
+* SSL/TLS/HTTPS
 * Over-the-Air (OTA) upgrades
 * Filesystems (LittleFS and SD/SDFS)
 * Multicore support (setup1() and loop1())
@@ -171,6 +185,7 @@ Here are some links to coverage and additional tutorials for using `arduino-pico
 * Pre-release Adafruit QT Py RP2040 - https://www.youtube.com/watch?v=sfC1msqXX0I
 * Adafruit Feather RP2040 running LCD + TMP117 - https://www.youtube.com/watch?v=fKDeqZiIwHg
 * Demonstration of Servos and I2C in Korean - https://cafe.naver.com/arduinoshield/1201
+* Home Assistant Pico W integration starter project using Arduino - https://github.com/daniloc/PicoW_HomeAssistant_Starter
 
 # Contributing
 If you want to contribute or have bugfixes, drop me a note at <earlephilhower@yahoo.com> or open an issue/PR here.
@@ -188,7 +203,10 @@ If you want to contribute or have bugfixes, drop me a note at <earlephilhower@ya
 * [lwIP](https://savannah.nongnu.org/projects/lwip/) is (c) the Swedish Institute of Computer Science and licenced under the BSD license.
 * [BearSSL](https://bearssl.org) library written by Thomas Pornin, is distributed under the [MIT License](https://bearssl.org/#legal-details).
 * [UZLib](https://github.com/pfalcon/uzlib) is copyright (c) 2003 Joergen Ibsen and distributed under the zlib license.
-* [LEAmDMS](https://github.com/LaborEtArs/ESP8266mDNS) is copyright multiple authors and distributed under the MIT license.
+* [LEAmDNS](https://github.com/LaborEtArs/ESP8266mDNS) is copyright multiple authors and distributed under the MIT license.
+* [http-parser](https://github.com/nodejs/http-parser) is copyright Joyent, Inc. and other Node contributors.
+* WebServer code modified from the [ESP32 WebServer](https://github.com/espressif/arduino-esp32/tree/master/libraries/WebServer) and is copyright (c) 2015 Ivan Grokhotkov and others
+
 
 -Earle F. Philhower, III  
  earlephilhower@yahoo.com

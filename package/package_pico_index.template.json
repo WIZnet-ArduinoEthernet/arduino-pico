@@ -27,6 +27,9 @@
                      "name": "Adafruit Feather RP2040"
                   },
                   {
+                     "name": "Adafruit Feather RP2040 SCORPIO"
+                  },
+                  {
                      "name": "Adafruit ItsyBitsy RP2040"
                   },
                   {
@@ -48,10 +51,19 @@
                      "name": "Arduino Nano RP2040 Connect"
                   },
                   {
+                     "name": "BridgeTek IDM2040-7A"
+                  },
+                  {
                      "name": "Cytron Maker Nano RP2040"
                   },
                   {
                      "name": "Cytron Maker Pi RP2040"
+                  },
+                  {
+                     "name": "DatanoiseTV PicoADK"
+                  },
+                  {
+                     "name": "Degz Mizu"
                   },
                   {
                      "name": "DeRuiLab FlyBoard2040Core"
@@ -61,6 +73,9 @@
                   },
                   {
                      "name": "ElectronicCats HunterCat NFC RP2040"
+                  },
+                  {
+                     "name": "ExtremeElectronics RC2040"
                   },
                   {
                      "name": "iLabs Challenger 2040 LTE"
@@ -84,10 +99,19 @@
                      "name": "iLabs Challenger 2040 SD/RTC"
                   },
                   {
+                     "name": "iLabs Challenger 2040 NFC"
+                  },
+                  {
                      "name": "iLabs RPICO32"
                   },
                   {
+                     "name": "Melopero Cookie RP2040"
+                  },
+                  {
                      "name": "Melopero Shake RP2040"
+                  },
+                  {
+                     "name": "Pimoroni PGA2040"
                   },
                   {
                      "name": "Solder Party RP2040 Stamp"
@@ -103,6 +127,24 @@
                   },
                   {
                      "name": "Seeed XIAO RP2040"
+                  },
+                  {
+                     "name": "Waveshare RP2040 Zero"
+                  },
+                  {
+                     "name": "Waveshare RP2040 One"
+                  },
+                  {
+                     "name": "Waveshare RP2040 Plus 4MB"
+                  },
+                  {
+                     "name": "Waveshare RP2040 Plus 16MB"
+                  },
+                  {
+                     "name": "Waveshare RP2040 LCD 0.96"
+                  },
+                  {
+                     "name": "Waveshare RP2040 LCD 1.28"
                   },
                   {
                      "name": "WIZnet W5100S-EVB-Pico"

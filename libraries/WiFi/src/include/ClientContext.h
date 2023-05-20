@@ -27,6 +27,8 @@ class WiFiClient;
 typedef void (*discard_cb_t)(void*, ClientContext*);
 
 #include <assert.h>
+#include "lwip/timeouts.h"
+
 //#include <esp_priv.h>
 //#include <coredecls.h>
 
@@ -36,6 +38,7 @@ template <typename T>
 inline void esp_delay(const uint32_t timeout_ms, T&& blocked, const uint32_t intvl_ms) {
     const auto start_ms = millis();
     while ((((uint32_t)millis() - start_ms) < timeout_ms) && blocked()) {
+        sys_check_timeouts();
         delay(intvl_ms);
     }
 }
@@ -63,12 +66,11 @@ public:
     err_t abort() {
         if (_pcb) {
             DEBUGV(":abort\r\n");
-            tcp_arg(_pcb, NULL);
-            tcp_sent(_pcb, NULL);
-            tcp_recv(_pcb, NULL);
-            tcp_err(_pcb, NULL);
-            tcp_poll(_pcb, NULL, 0);
-            LWIPMutex m;  // Block the timer sys_check_timeouts call
+            tcp_arg(_pcb, nullptr);
+            tcp_sent(_pcb, nullptr);
+            tcp_recv(_pcb, nullptr);
+            tcp_err(_pcb, nullptr);
+            tcp_poll(_pcb, nullptr, 0);
             tcp_abort(_pcb);
             _pcb = nullptr;
         }
@@ -79,12 +81,11 @@ public:
         err_t err = ERR_OK;
         if (_pcb) {
             DEBUGV(":close\r\n");
-            tcp_arg(_pcb, NULL);
-            tcp_sent(_pcb, NULL);
-            tcp_recv(_pcb, NULL);
-            tcp_err(_pcb, NULL);
-            tcp_poll(_pcb, NULL, 0);
-            LWIPMutex m;  // Block the timer sys_check_timeouts call
+            tcp_arg(_pcb, nullptr);
+            tcp_sent(_pcb, nullptr);
+            tcp_recv(_pcb, nullptr);
+            tcp_err(_pcb, nullptr);
+            tcp_poll(_pcb, nullptr, 0);
             err = tcp_close(_pcb);
             if (err != ERR_OK) {
                 DEBUGV(":tc err %d\r\n", (int) err);
@@ -136,7 +137,6 @@ public:
             ip6_addr_assign_zone(ip_2_ip6(addr), IP6_UNKNOWN, netif_default);
         }
 #endif
-        LWIPMutex m;  // Block the timer sys_check_timeouts call
         err_t err = tcp_connect(_pcb, addr, port, &ClientContext::_s_connected);
         if (err != ERR_OK) {
             return 0;
@@ -162,7 +162,6 @@ public:
     }
 
     size_t availableForWrite() const {
-        LWIPMutex m;  // Block the timer sys_check_timeouts call
         return _pcb ? tcp_sndbuf(_pcb) : 0;
     }
 
@@ -170,7 +169,6 @@ public:
         if (!_pcb) {
             return;
         }
-        LWIPMutex m;  // Block the timer sys_check_timeouts call
         if (nodelay) {
             tcp_nagle_disable(_pcb);
         } else {
@@ -182,7 +180,6 @@ public:
         if (!_pcb) {
             return false;
         }
-        LWIPMutex m;  // Block the timer sys_check_timeouts call
         return tcp_nagle_disabled(_pcb);
     }
 
@@ -300,7 +297,6 @@ public:
         if (!_rx_buf) {
             return;
         }
-        LWIPMutex m;  // Block the timer sys_check_timeouts call
         if (_pcb) {
             tcp_recved(_pcb, (size_t) _rx_buf->tot_len);
         }
@@ -332,7 +328,6 @@ public:
                 return false;
             }
 
-            LWIPMutex m;  // Block the timer sys_check_timeouts call
 
             // force lwIP to send what can be sent
             tcp_output(_pcb);
@@ -372,6 +367,33 @@ public:
             return 0;
         }
         return _write_from_source(ds, dl);
+    }
+
+    size_t write(Stream& stream) {
+        if (!_pcb) {
+            return 0;
+        }
+        size_t sent = 0;
+        uint8_t buff[256];
+        while (stream.available()) {
+            // Stream only lets you read 1 byte at a time, so buffer in local copy
+            size_t i;
+            for (i = 0; (i < sizeof(buff)) && stream.available(); i++) {
+                buff[i] = stream.read();
+            }
+            if (i) {
+                // Send as a single packet
+                int len = write((const char *)buff, i);
+                sent += len;
+                if (len != (int)i) {
+                    break; // Write error...
+                }
+            } else {
+                // Out of data...
+                break;
+            }
+        }
+        return sent;
     }
 
     void keepAlive(uint16_t idle_sec = TCP_DEFAULT_KEEPALIVE_IDLE_SEC, uint16_t intv_sec = TCP_DEFAULT_KEEPALIVE_INTERVAL_SEC, uint8_t count = TCP_DEFAULT_KEEPALIVE_COUNT) {
@@ -500,7 +522,6 @@ protected:
             const auto remaining = _datalen - _written;
             size_t next_chunk_size;
             {
-                LWIPMutex m;  // Block the timer sys_check_timeouts call, just for this call
                 next_chunk_size = std::min((size_t)tcp_sndbuf(_pcb), remaining);
                 // Potentially reduce transmit size if we are tight on memory, but only if it doesn't return a 0 chunk size
                 if (next_chunk_size > (size_t)(1 << scale)) {
@@ -554,7 +575,6 @@ protected:
             // lwIP's tcp_output doc: "Find out what we can send and send it"
             // *with respect to Nagle*
             // more info: https://lists.gnu.org/archive/html/lwip-users/2017-11/msg00134.html
-            LWIPMutex m;  // Block the timer sys_check_timeouts call
             tcp_output(_pcb);
         }
 
@@ -579,7 +599,6 @@ protected:
 
     void _consume(size_t size) {
         ptrdiff_t left = _rx_buf->len - _rx_buf_offset - size;
-        LWIPMutex m;  // Block the timer sys_check_timeouts call
         if (left > 0) {
             _rx_buf_offset += size;
         } else if (!_rx_buf->next) {
@@ -621,7 +640,6 @@ protected:
 
         if (_rx_buf) {
             DEBUGV(":rch %d, %d\r\n", _rx_buf->tot_len, pb->tot_len);
-            LWIPMutex m;  // Block the timer sys_check_timeouts call
             pbuf_cat(_rx_buf, pb);
         } else {
             DEBUGV(":rn %d\r\n", pb->tot_len);
@@ -634,10 +652,10 @@ protected:
     void _error(err_t err) {
         (void) err;
         DEBUGV(":er %d 0x%08x\r\n", (int) err, (uint32_t) _datasource);
-        tcp_arg(_pcb, NULL);
-        tcp_sent(_pcb, NULL);
-        tcp_recv(_pcb, NULL);
-        tcp_err(_pcb, NULL);
+        tcp_arg(_pcb, nullptr);
+        tcp_sent(_pcb, nullptr);
+        tcp_recv(_pcb, nullptr);
+        tcp_err(_pcb, nullptr);
         _pcb = nullptr;
         _notify_error();
     }
@@ -659,24 +677,44 @@ protected:
         return ERR_OK;
     }
 
+    // We may receive a nullptr as arg in the case when an IRQ happens during a shutdown sequence
+    // In that case, just ignore the CB
     static err_t _s_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *pb, err_t err) {
-        return reinterpret_cast<ClientContext*>(arg)->_recv(tpcb, pb, err);
+        if (arg) {
+            return reinterpret_cast<ClientContext*>(arg)->_recv(tpcb, pb, err);
+        } else {
+            return ERR_OK;
+        }
     }
 
     static void _s_error(void *arg, err_t err) {
-        reinterpret_cast<ClientContext*>(arg)->_error(err);
+        if (arg) {
+            reinterpret_cast<ClientContext*>(arg)->_error(err);
+        }
     }
 
     static err_t _s_poll(void *arg, struct tcp_pcb *tpcb) {
-        return reinterpret_cast<ClientContext*>(arg)->_poll(tpcb);
+        if (arg) {
+            return reinterpret_cast<ClientContext*>(arg)->_poll(tpcb);
+        } else {
+            return ERR_OK;
+        }
     }
 
     static err_t _s_acked(void *arg, struct tcp_pcb *tpcb, uint16_t len) {
-        return reinterpret_cast<ClientContext*>(arg)->_acked(tpcb, len);
+        if (arg) {
+            return reinterpret_cast<ClientContext*>(arg)->_acked(tpcb, len);
+        } else {
+            return ERR_OK;
+        }
     }
 
     static err_t _s_connected(void* arg, struct tcp_pcb *pcb, err_t err) {
-        return reinterpret_cast<ClientContext*>(arg)->_connected(pcb, err);
+        if (arg) {
+            return reinterpret_cast<ClientContext*>(arg)->_connected(pcb, err);
+        } else {
+            return ERR_OK;
+        }
     }
 
 private:

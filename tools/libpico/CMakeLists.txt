@@ -31,6 +31,7 @@ target_compile_definitions(pico PUBLIC
         PICO_RP2040_B0_SUPPORTED=1
         PICO_RP2040_B1_SUPPORTED=1
         PICO_RP2040_B2_SUPPORTED=1
+        PICO_NO_BINARY_INFO=1
 )
 
 target_compile_options(pico PUBLIC
@@ -96,6 +97,6 @@ target_link_libraries(pico
 )
 
 add_custom_command(TARGET pico POST_BUILD
-	COMMAND ar d libpico.a stdio.c.obj stdio_usb.c.obj stdio_usb_descriptors.c.obj cyw43_arch_threadsafe_background.c.obj
+	COMMAND ar d libpico.a stdio.c.obj stdio_usb.c.obj stdio_usb_descriptors.c.obj cyw43_arch_threadsafe_background.c.obj pico_malloc.c.obj
 	COMMAND ar q libpico.a pico-sdk/src/rp2_common/cyw43_driver/cyw43_resource.o
 )

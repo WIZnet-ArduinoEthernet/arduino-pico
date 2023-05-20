@@ -32,19 +32,9 @@
 #include "ccount.pio.h"
 #include <malloc.h>
 
+#include "_freertos.h"
+
 extern "C" volatile bool __otherCoreIdled;
-
-// Halt the FreeRTOS PendSV task switching magic
-extern "C" int __holdUpPendSV;
-
-// FreeRTOS weak functions, to be overridden when we really are running FreeRTOS
-extern "C" {
-    extern void vTaskSuspendAll() __attribute__((weak));
-    extern int32_t xTaskResumeAll() __attribute__((weak));
-    typedef struct tskTaskControlBlock * TaskHandle_t;
-    extern void vTaskPreemptionDisable(TaskHandle_t p) __attribute__((weak));
-    extern void vTaskPreemptionEnable(TaskHandle_t p) __attribute__((weak));
-}
 
 class _MFIFO {
 public:
@@ -248,7 +238,7 @@ public:
     // Convert from microseconds to PIO clock cycles
     static int usToPIOCycles(int us) {
         // Parenthesis needed to guarantee order of operations to avoid 32bit overflow
-        return (us * (clock_get_hz(clk_sys) / 1000000));
+        return (us * (clock_get_hz(clk_sys) / 1'000'000));
     }
 
     // Get current clock frequency
@@ -314,15 +304,28 @@ public:
     }
 
     void reboot() {
-        watchdog_reboot(0, 0, 100);
+        watchdog_reboot(0, 0, 10);
+        while (1) {
+            continue;
+        }
     }
 
     inline void restart() {
         reboot();
     }
 
+    static void enableDoubleResetBootloader();
+
+    void wdt_begin(uint32_t delay_ms) {
+        watchdog_enable(delay_ms, 1);
+    }
+
+    void wdt_reset() {
+        watchdog_update();
+    }
+
     const char *getChipID() {
-        static char id[PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1] = { 0 };
+        static char id[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1] = { 0 };
         if (!id[0]) {
             pico_get_unique_board_id_string(id, sizeof(id));
         }
